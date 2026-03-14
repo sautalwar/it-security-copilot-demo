@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Copilot for IT Security — Live Demo</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+code, pre, .cmd {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+
+a { color: #58a6ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---- Header ---- */
+.header {
+  background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+  border-bottom: 1px solid #30363d;
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 100;
+}
+
+.header-left { flex: 1; }
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #e6edf3;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header h1 .icon { font-size: 1.75rem; }
+
+.header .subtitle {
+  color: #8b949e;
+  font-size: 0.95rem;
+  margin-top: 0.15rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.timer-display {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.4rem 1rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #8b949e;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.timer-display.running {
+  color: #3fb950;
+  border-color: #238636;
+  box-shadow: 0 0 8px rgba(63,185,80,0.15);
+}
+
+.btn-icon {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  color: #e6edf3;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+}
+
+.btn-icon.active {
+  background: #1f1030;
+  border-color: #bc8cff;
+  color: #bc8cff;
+}
+
+.gh-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  transition: all 0.2s;
+}
+
+.gh-link:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+  text-decoration: none;
+}
+
+.gh-link svg { fill: #e6edf3; }
+
+/* ---- Progress Bar ---- */
+.progress-container {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 0.5rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.progress-bar-track {
+  flex: 1;
+  height: 6px;
+  background: #21262d;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #58a6ff, #3fb950);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.progress-text {
+  font-size: 0.8rem;
+  color: #8b949e;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* ---- Story Intro Card ---- */
+.story-intro {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.story-intro .card {
+  background: linear-gradient(135deg, #161b22 0%, #1c2333 100%);
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 2rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.story-intro .card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #58a6ff, #bc8cff, #f85149);
+}
+
+.story-intro h2 {
+  font-size: 1.1rem;
+  color: #58a6ff;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.story-intro p {
+  color: #8b949e;
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.story-intro p em {
+  color: #e6edf3;
+  font-style: italic;
+}
+
+/* ---- Timeline Bar ---- */
+.timeline-bar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.timeline-inner {
+  display: flex;
+  max-width: 1100px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.timeline-act {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.timeline-act:hover {
+  background: #21262d;
+}
+
+.timeline-act.active {
+  border-bottom-color: #58a6ff;
+  background: rgba(88,166,255,0.06);
+}
+
+.timeline-act .act-emoji { font-size: 1.3rem; display: block; margin-bottom: 0.15rem; }
+.timeline-act .act-title { font-size: 0.8rem; font-weight: 600; color: #e6edf3; }
+.timeline-act .act-time { font-size: 0.7rem; color: #8b949e; }
+.timeline-act .act-scenarios { font-size: 0.65rem; color: #8b949e; }
+
+/* ---- Act Section ---- */
+.act-section {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 2rem 1rem;
+}
+
+.act-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.act-header .act-num {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #58a6ff;
+}
+
+.act-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.act-header .act-time-label {
+  color: #8b949e;
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+/* ---- Scenario Card ---- */
+.scenario-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.scenario-card:hover {
+  border-color: #484f58;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+.scenario-card.done {
+  border-color: #238636;
+}
+
+.scenario-card.done .card-header { opacity: 0.7; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.card-header .scenario-num {
+  background: #21262d;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #58a6ff;
+  flex-shrink: 0;
+  border: 1px solid #30363d;
+}
+
+.card-header .scenario-emoji { font-size: 1.5rem; flex-shrink: 0; }
+
+.card-header .scenario-title-block { flex: 1; }
+.card-header .scenario-title { font-size: 1.05rem; font-weight: 600; color: #e6edf3; }
+.card-header .scenario-subtitle { font-size: 0.8rem; color: #8b949e; margin-top: 0.1rem; }
+
+.status-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #30363d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  color: transparent;
+  background: #21262d;
+}
+
+.status-check:hover {
+  border-color: #3fb950;
+}
+
+.status-check.checked {
+  background: #238636;
+  border-color: #3fb950;
+  color: #fff;
+}
+
+.card-body {
+  padding: 0 1.5rem 1.5rem;
+}
+
+/* Story context */
+.story-context {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #8b949e;
+  line-height: 1.7;
+}
+
+.story-context strong { color: #e6edf3; }
+
+/* Copilot explanation */
+.copilot-action {
+  background: rgba(88,166,255,0.06);
+  border: 1px solid rgba(88,166,255,0.15);
+  border-radius: 8px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.copilot-action .cp-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.15rem; }
+
+.copilot-action p {
+  font-size: 0.88rem;
+  color: #58a6ff;
+  line-height: 1.6;
+}
+
+/* Demo steps */
+.demo-steps {
+  margin-bottom: 1rem;
+}
+
+.demo-steps-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.step-list {
+  list-style: none;
+  counter-reset: steps;
+}
+
+.step-list li {
+  counter-increment: steps;
+  padding: 0.5rem 0;
+  padding-left: 2rem;
+  position: relative;
+  font-size: 0.88rem;
+  color: #8b949e;
+  border-left: 2px solid #21262d;
+  margin-left: 0.75rem;
+}
+
+.step-list li:last-child { border-left-color: transparent; }
+
+.step-list li::before {
+  content: counter(steps);
+  position: absolute;
+  left: -0.65rem;
+  top: 0.45rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #21262d;
+  border: 1px solid #30363d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #58a6ff;
+}
+
+/* Command block */
+.cmd-block {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  overflow: hidden;
+}
+
+.cmd-bar {
+  background: #161b22;
+  padding: 0.3rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #21262d;
+}
+
+.cmd-bar .dots {
+  display: flex;
+  gap: 5px;
+}
+
+.cmd-bar .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.cmd-bar .dot.r { background: #f85149; }
+.cmd-bar .dot.y { background: #d29922; }
+.cmd-bar .dot.g { background: #3fb950; }
+
+.copy-btn {
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #8b949e;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: system-ui, sans-serif;
+}
+
+.copy-btn:hover {
+  background: #21262d;
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.copy-btn.copied {
+  border-color: #3fb950;
+  color: #3fb950;
+}
+
+.cmd-body {
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.cmd-body .prompt { color: #3fb950; }
+
+/* Notes (talk track) */
+.notes {
+  background: rgba(188,140,255,0.06);
+  border: 1px solid rgba(188,140,255,0.15);
+  border-left: 4px solid #bc8cff;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  display: none;
+}
+
+.notes.visible { display: block; }
+
+.notes-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #bc8cff;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.notes p {
+  font-size: 0.88rem;
+  color: #c9d1d9;
+  line-height: 1.7;
+  font-style: italic;
+}
+
+/* Key files & workflow */
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.meta-box {
+  flex: 1;
+  min-width: 220px;
+}
+
+.meta-box-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.35rem;
+}
+
+.file-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.file-list li a {
+  display: inline-block;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  color: #58a6ff;
+  transition: all 0.15s;
+}
+
+.file-list li a:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+  text-decoration: none;
+}
+
+.workflow-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  color: #d29922;
+}
+
+.workflow-badge .wf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d29922;
+}
+
+/* ---- Setup/Teardown ---- */
+.setup-panel {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 2rem 2rem;
+}
+
+.setup-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.setup-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #21262d;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.setup-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.setup-body {
+  padding: 1.25rem 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.setup-item {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.setup-item .setup-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-bottom: 0.5rem;
+}
+
+.setup-item .setup-desc {
+  font-size: 0.78rem;
+  color: #8b949e;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- Footer ---- */
+.footer {
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  color: #8b949e;
+  font-size: 0.82rem;
+}
+
+.footer a { color: #58a6ff; }
+.footer .footer-items { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; align-items: center; }
+.footer .kbd { background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-family: monospace; color: #e6edf3; }
+
+/* ---- Keyboard shortcuts modal ---- */
+.shortcuts-hint {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.75rem;
+  color: #8b949e;
+  z-index: 80;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.shortcuts-hint:hover { opacity: 1; }
+.shortcuts-hint .kbd { background: #161b22; border: 1px solid #30363d; border-radius: 3px; padding: 0.05rem 0.35rem; font-family: monospace; color: #e6edf3; margin: 0 0.1rem; }
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+  .header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+  .header-right { width: 100%; justify-content: flex-start; }
+  .timeline-act { min-width: 140px; padding: 0.5rem 0.6rem; }
+  .act-section { padding: 1.5rem 1rem 1rem; }
+  .card-body { padding: 0 1rem 1rem; }
+  .meta-row { flex-direction: column; }
+  .setup-body { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-left">
+    <h1><span class="icon">&#x1F6E1;&#xFE0F;</span> GitHub Copilot for IT Security &mdash; Live Demo</h1>
+    <div class="subtitle">A Day in the Life of a Security Operations Team</div>
+  </div>
+  <div class="header-right">
+    <div class="timer-display" id="timer" title="Click to start/stop timer (T)">00:00:00</div>
+    <button class="btn-icon" id="notesToggle" title="Toggle presenter notes (N)">&#x1F3A4;</button>
+    <a href="https://github.com/sautalwar/it-security-copilot-demo" target="_blank" rel="noopener" class="gh-link" title="Open GitHub repo">
+      <svg width="20" height="20" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+    </a>
+  </div>
+</header>
+
+<!-- ===== PROGRESS BAR ===== -->
+<div class="progress-container">
+  <div class="progress-bar-track">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+  <div class="progress-text" id="progressText">0 / 12 done</div>
+</div>
+
+<!-- ===== TIMELINE BAR ===== -->
+<nav class="timeline-bar" id="timelineBar">
+  <div class="timeline-inner">
+    <div class="timeline-act" data-act="act1">
+      <span class="act-emoji">&#x1F6A8;</span>
+      <span class="act-title">Morning Alert</span>
+      <span class="act-time">8:00 AM</span>
+      <span class="act-scenarios">Scenarios 1&ndash;2</span>
+    </div>
+    <div class="timeline-act" data-act="act2">
+      <span class="act-emoji">&#x1F50D;</span>
+      <span class="act-title">Investigation</span>
+      <span class="act-time">10:00 AM</span>
+      <span class="act-scenarios">Scenarios 3&ndash;4</span>
+    </div>
+    <div class="timeline-act" data-act="act3">
+      <span class="act-emoji">&#x1F527;</span>
+      <span class="act-title">Remediation</span>
+      <span class="act-time">1:00 PM</span>
+      <span class="act-scenarios">Scenarios 5&ndash;7</span>
+    </div>
+    <div class="timeline-act" data-act="act4">
+      <span class="act-emoji">&#x1F6E1;&#xFE0F;</span>
+      <span class="act-title">Hardening</span>
+      <span class="act-time">3:00 PM</span>
+      <span class="act-scenarios">Scenarios 8&ndash;10</span>
+    </div>
+    <div class="timeline-act" data-act="act5">
+      <span class="act-emoji">&#x1F4CA;</span>
+      <span class="act-title">Resolution</span>
+      <span class="act-time">5:00 PM</span>
+      <span class="act-scenarios">Scenarios 11&ndash;12</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== STORY INTRO ===== -->
+<section class="story-intro">
+  <div class="card">
+    <h2>&#x1F4D6; Setting the Scene</h2>
+    <p>
+      <em>It's 8:00 AM at Contoso Corp.</em> CISO Sarah Chen's phone buzzes &mdash; the SIEM has flagged anomalous DNS traffic
+      from the production subnet. What follows is a real-time demonstration of how <strong>GitHub Copilot transforms
+      incident response</strong>, taking us through alert triage, investigation, remediation, infrastructure hardening,
+      and executive reporting &mdash; all in a single working day. Each scenario is a live, runnable demo backed by
+      real code, real GitHub Actions workflows, and real security tooling.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- ACT 1: Morning Alert                                          -->
+<!-- ============================================================= -->
+<section class="act-section" id="act1">
+  <div class="act-header">
+    <span class="act-num">Act 1</span>
+    <h2>&#x1F6A8; Morning Alert</h2>
+    <span class="act-time-label">8:00 AM</span>
+  </div>
+
+  <!-- Scenario 1 -->
+  <article class="scenario-card" data-scenario="1">
+    <div class="card-header">
+      <span class="scenario-num">1</span>
+      <span class="scenario-emoji">&#x1F4E1;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">DNS Exfiltration Alert</div>
+        <div class="scenario-subtitle">Detect and analyze DNS tunneling attempts</div>
+      </div>
+      <div class="status-check" data-id="s1" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> Sarah notices a spike in DNS queries to randomized subdomains. The SIEM correlation engine has flagged these as potential data exfiltration via DNS tunneling. Each subdomain is a base64-encoded chunk of stolen data. Time to investigate.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Analyzes DNS log patterns, identifies entropy anomalies in subdomain strings, generates detection rules, and produces remediation code to block tunneling attempts.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation script:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/01-dns-alert/simulate.py</div></div>
+          </li>
+          <li>Show the generated vulnerable DNS monitor file in VS Code</li>
+          <li>Ask Copilot to review the file and suggest fixes</li>
+          <li>Run the remediation script:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/01-dns-alert/remediate.py</div></div>
+          </li>
+          <li>Show the diff between vulnerable and fixed versions</li>
+          <li>Trigger the GitHub Actions workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run dns-threat-detection.yml</div></div>
+          </li>
+          <li>Open GitHub Actions to show the pipeline running</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"So what we're seeing here is a classic DNS tunneling pattern. The attacker is encoding data in subdomain queries &mdash; each of those random-looking subdomains is actually base64-encoded exfiltrated data. Notice the entropy scores Copilot is calculating &mdash; legitimate DNS queries typically have an entropy below 3.5, but these are all above 4.0. Now watch what happens when I ask Copilot to analyze this and generate detection rules. It understands network security patterns at a deep level, and within seconds, we have production-ready monitoring code."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/dns_monitor.py" target="_blank">vulnerable-app/dns_monitor.py</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/dns_queries.log" target="_blank">vulnerable-app/dns_queries.log</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>dns-threat-detection.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 2 -->
+  <article class="scenario-card" data-scenario="2">
+    <div class="card-header">
+      <span class="scenario-num">2</span>
+      <span class="scenario-emoji">&#x1F50E;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">KQL / SIEM Investigation</div>
+        <div class="scenario-subtitle">Correlate events with Sentinel-style queries</div>
+      </div>
+      <div class="status-check" data-id="s2" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> Sarah needs to correlate the DNS alerts with authentication events, firewall logs, and endpoint telemetry. She opens the SIEM console and starts crafting KQL queries to understand the full scope of the breach.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Generates complex KQL queries for Microsoft Sentinel, correlates events across multiple data sources, and identifies related indicators of compromise.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation script:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/02-kql-investigation/simulate.py</div></div>
+          </li>
+          <li>Show the generated SIEM configuration in VS Code</li>
+          <li>Ask Copilot to write KQL queries for event correlation</li>
+          <li>Run the remediation script:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/02-kql-investigation/remediate.py</div></div>
+          </li>
+          <li>Show the improved Sentinel query files</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run security-scan.yml</div></div>
+          </li>
+          <li>Open GitHub Actions to show the scan running</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Now we need the full picture. I'm going to ask Copilot to help me write KQL queries that correlate DNS events with sign-in logs, firewall data, and endpoint alerts. Watch how it understands the Sentinel schema &mdash; it knows the table names, column structures, and even suggests time-window joins. This is where Copilot really shines: turning hours of manual query crafting into seconds. The correlation reveals that the DNS tunneling coincides with a compromised service account authenticating from an unusual IP."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/siem_config.json" target="_blank">vulnerable-app/siem_config.json</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/tree/main/vulnerable-app/sentinel_queries/" target="_blank">vulnerable-app/sentinel_queries/</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>security-scan.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================================= -->
+<!-- ACT 2: Investigation                                          -->
+<!-- ============================================================= -->
+<section class="act-section" id="act2">
+  <div class="act-header">
+    <span class="act-num">Act 2</span>
+    <h2>&#x1F50D; Investigation</h2>
+    <span class="act-time-label">10:00 AM</span>
+  </div>
+
+  <!-- Scenario 3 -->
+  <article class="scenario-card" data-scenario="3">
+    <div class="card-header">
+      <span class="scenario-num">3</span>
+      <span class="scenario-emoji">&#x1F9F1;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Firewall Containment</div>
+        <div class="scenario-subtitle">Emergency network containment rules</div>
+      </div>
+      <div class="status-check" data-id="s3" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> With the threat actor identified, Sarah's team needs to immediately contain the breach. They must deploy emergency firewall rules to block C2 communication while maintaining business continuity for legitimate traffic.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Generates defense-in-depth firewall rules, creates NSG configurations in Bicep, and validates that containment rules don't break production services.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/03-firewall-containment/simulate.py</div></div>
+          </li>
+          <li>Show the overly permissive firewall rules in VS Code</li>
+          <li>Ask Copilot to harden the firewall configuration</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/03-firewall-containment/remediate.py</div></div>
+          </li>
+          <li>Review the generated NSG Bicep configuration</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run firewall-validation.yml</div></div>
+          </li>
+          <li>Show the firewall validation results in GitHub Actions</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Now we're in incident response mode. We need to contain this threat immediately without taking down production. Look at these existing firewall rules &mdash; they're way too permissive, essentially 'allow all' on several ports. I'm going to ask Copilot to generate emergency containment rules. Notice how it creates a defense-in-depth approach: blocking the known C2 IPs at the NSG level, restricting outbound DNS to known resolvers, and adding Azure Firewall rules as a second layer. It even generates the Bicep template for infrastructure-as-code deployment."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/firewall_rules.json" target="_blank">vulnerable-app/firewall_rules.json</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/infra/nsg_rules.bicep" target="_blank">infra/nsg_rules.bicep</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>firewall-validation.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 4 -->
+  <article class="scenario-card" data-scenario="4">
+    <div class="card-header">
+      <span class="scenario-num">4</span>
+      <span class="scenario-emoji">&#x1F575;&#xFE0F;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Network Forensics</div>
+        <div class="scenario-subtitle">Deep packet analysis and IOC extraction</div>
+      </div>
+      <div class="status-check" data-id="s4" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> The SOC team begins a full forensic investigation. They need to capture and analyze network traffic, extract indicators of compromise, and build a timeline of the attack. Evidence must be handled with proper chain of custody procedures.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Generates network capture scripts, writes PCAP analysis code, extracts IOCs (IPs, domains, file hashes), and produces a structured forensic report with timeline.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/04-network-forensics/simulate.py</div></div>
+          </li>
+          <li>Show the network capture code and forensic data</li>
+          <li>Ask Copilot to analyze the captures and extract IOCs</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/04-network-forensics/remediate.py</div></div>
+          </li>
+          <li>Show the generated forensic report</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run security-scan.yml</div></div>
+          </li>
+          <li>Review the security scan results</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Now we shift into forensics mode. This is where we build the evidence package &mdash; proper chain of custody, timeline reconstruction, IOC extraction. Copilot is helping us write PCAP analysis code that pulls out every indicator of compromise: source and destination IPs, suspicious domains, file hashes, even behavioral patterns. Look at this forensic report it helped generate &mdash; it follows NIST SP 800-86 guidelines for digital forensics. This is the kind of documentation that would normally take hours to compile."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/network_capture.py" target="_blank">vulnerable-app/network_capture.py</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/forensic_report.md" target="_blank">vulnerable-app/forensic_report.md</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>security-scan.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================================= -->
+<!-- ACT 3: Remediation                                            -->
+<!-- ============================================================= -->
+<section class="act-section" id="act3">
+  <div class="act-header">
+    <span class="act-num">Act 3</span>
+    <h2>&#x1F527; Remediation</h2>
+    <span class="act-time-label">1:00 PM</span>
+  </div>
+
+  <!-- Scenario 5 -->
+  <article class="scenario-card" data-scenario="5">
+    <div class="card-header">
+      <span class="scenario-num">5</span>
+      <span class="scenario-emoji">&#x1F511;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Secret Exposure</div>
+        <div class="scenario-subtitle">Detect and rotate leaked credentials</div>
+      </div>
+      <div class="status-check" data-id="s5" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> During the investigation, the team discovers hardcoded API keys and database credentials in the application source code. These secrets may have been exposed in the Git history and could be the initial attack vector.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Identifies hardcoded secrets in source code, generates secure configuration using Azure Key Vault, implements credential rotation, and sets up push protection.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/05-secret-exposure/simulate.py</div></div>
+          </li>
+          <li>Show the config file with exposed secrets in VS Code</li>
+          <li>Ask Copilot to refactor the code to use Key Vault</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/05-secret-exposure/remediate.py</div></div>
+          </li>
+          <li>Show the diff between insecure and secure config</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run security-scan.yml</div></div>
+          </li>
+          <li>Show secret scanning alerts in GitHub</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Here's something we see in almost every organization &mdash; hardcoded secrets in source code. This config file has database connection strings, API keys, even an Azure storage account key right in plain text. Copilot not only identifies every secret, but it generates the complete refactoring &mdash; Azure Key Vault integration, managed identity setup, and environment-based configuration. And with GitHub push protection enabled, this kind of secret can never be committed again. Let me show you the before and after &mdash; the secure version uses Key Vault references throughout."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/config.py" target="_blank">vulnerable-app/config.py</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/config_secure.py" target="_blank">vulnerable-app/config_secure.py</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>security-scan.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 6 -->
+  <article class="scenario-card" data-scenario="6">
+    <div class="card-header">
+      <span class="scenario-num">6</span>
+      <span class="scenario-emoji">&#x1F3D7;&#xFE0F;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">IaC Hardening</div>
+        <div class="scenario-subtitle">Secure infrastructure templates and CIS benchmarks</div>
+      </div>
+      <div class="status-check" data-id="s6" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> The team realizes the cloud infrastructure was deployed with insecure defaults &mdash; public storage accounts, missing encryption, overly permissive IAM roles. They need to harden the Bicep and Terraform templates to meet CIS benchmarks.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Audits IaC templates against CIS benchmarks, generates compliant Bicep/Terraform code, adds security controls like encryption, private endpoints, and least-privilege access.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/06-iac-hardening/simulate.py</div></div>
+          </li>
+          <li>Show the insecure Bicep/Terraform files in VS Code</li>
+          <li>Ask Copilot to audit and fix the IaC templates</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/06-iac-hardening/remediate.py</div></div>
+          </li>
+          <li>Show the hardened infrastructure templates</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run iac-security-check.yml</div></div>
+          </li>
+          <li>Show the IaC security check results</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"This is the shift-left moment in our demo. These infrastructure templates were deployed with insecure defaults &mdash; public blob access, no encryption at rest, overly broad network access. Copilot audits the entire Bicep and Terraform codebase against CIS Azure Foundations Benchmark. It's not just finding problems; it's generating compliant code. Look at the changes: private endpoints, customer-managed encryption keys, network segmentation, diagnostic settings &mdash; all the controls an auditor would expect. And with IaC security checks in CI/CD, these misconfigurations can never reach production again."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/infra/main.bicep" target="_blank">infra/main.bicep</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/infra/main.tf" target="_blank">infra/main.tf</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>iac-security-check.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 7 -->
+  <article class="scenario-card" data-scenario="7">
+    <div class="card-header">
+      <span class="scenario-num">7</span>
+      <span class="scenario-emoji">&#x1F310;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">WAF &amp; Zero Trust</div>
+        <div class="scenario-subtitle">Web application firewall and microsegmentation</div>
+      </div>
+      <div class="status-check" data-id="s7" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> To prevent future breaches, Sarah's team implements a Web Application Firewall with OWASP rules and designs a Zero Trust network architecture with microsegmentation. Every connection must be authenticated and authorized.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Generates WAF rule configurations based on OWASP Core Rule Set, designs Zero Trust microsegmentation policies, and creates network flow validation tests.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/07-waf-zerotrust/simulate.py</div></div>
+          </li>
+          <li>Show the WAF and segmentation configs in VS Code</li>
+          <li>Ask Copilot to design a Zero Trust network policy</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/07-waf-zerotrust/remediate.py</div></div>
+          </li>
+          <li>Show the hardened WAF and Zero Trust configurations</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run firewall-validation.yml</div></div>
+          </li>
+          <li>Show the validation results</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Zero Trust isn't just a buzzword &mdash; it's an architecture. We're going to build it right now. First, the WAF: Copilot generates rules based on OWASP Core Rule Set 3.2, covering SQL injection, XSS, path traversal, and more. But the real power is in the microsegmentation. Look at this Zero Trust policy &mdash; every network segment is isolated, every connection requires authentication, and lateral movement is prevented by design. Copilot understands that the web tier should only talk to the API tier, the API tier only to the database, and nothing talks directly to the internet. This is defense in depth."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/infra/waf_rules.json" target="_blank">infra/waf_rules.json</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/infra/zero_trust_segmentation.json" target="_blank">infra/zero_trust_segmentation.json</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>firewall-validation.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================================= -->
+<!-- ACT 4: Hardening                                              -->
+<!-- ============================================================= -->
+<section class="act-section" id="act4">
+  <div class="act-header">
+    <span class="act-num">Act 4</span>
+    <h2>&#x1F6E1;&#xFE0F; Hardening</h2>
+    <span class="act-time-label">3:00 PM</span>
+  </div>
+
+  <!-- Scenario 8 -->
+  <article class="scenario-card" data-scenario="8">
+    <div class="card-header">
+      <span class="scenario-num">8</span>
+      <span class="scenario-emoji">&#x1F510;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">VPN Audit</div>
+        <div class="scenario-subtitle">Weak crypto detection and VPN hardening</div>
+      </div>
+      <div class="status-check" data-id="s8" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> The security audit reveals the corporate VPN is using outdated IKEv1 with weak DES encryption. The team needs to migrate to IKEv2 with modern cryptography and implement certificate-based authentication.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Audits VPN configurations for weak crypto, generates IKEv2 migration plans, creates certificate-based authentication configs, and produces audit reports.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/08-vpn-audit/simulate.py</div></div>
+          </li>
+          <li>Show the insecure VPN configuration in VS Code</li>
+          <li>Ask Copilot to audit and modernize the VPN config</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/08-vpn-audit/remediate.py</div></div>
+          </li>
+          <li>Show the audit report and upgraded config</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run compliance-check.yml</div></div>
+          </li>
+          <li>Show the compliance check results</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"VPN security is often overlooked &mdash; organizations set it up once and forget about it. This VPN config is using IKEv1 with 3DES and SHA-1 &mdash; algorithms that have been deprecated for years. Copilot identifies every weak cipher suite and generates a migration path to IKEv2 with AES-256-GCM, SHA-384, and ECDH key exchange. It also generates the certificate-based authentication config to eliminate shared secrets. Look at the audit report &mdash; it maps each finding to NIST SP 800-77 recommendations."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/vpn_config.json" target="_blank">vulnerable-app/vpn_config.json</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/vpn_audit_report.md" target="_blank">vulnerable-app/vpn_audit_report.md</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>compliance-check.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 9 -->
+  <article class="scenario-card" data-scenario="9">
+    <div class="card-header">
+      <span class="scenario-num">9</span>
+      <span class="scenario-emoji">&#x1F4DC;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Policy-as-Code</div>
+        <div class="scenario-subtitle">Automated compliance guardrails in CI/CD</div>
+      </div>
+      <div class="status-check" data-id="s9" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> Sarah decides the team needs automated guardrails &mdash; not manual gates. She asks the team to implement policy-as-code using OPA/Rego to enforce security policies in the CI/CD pipeline, preventing insecure configurations from ever being deployed.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Generates OPA/Rego policies for infrastructure validation, creates CI/CD integration scripts, and builds policy test suites to ensure guardrails work correctly.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/09-policy-as-code/simulate.py</div></div>
+          </li>
+          <li>Show the policy files and deployment scripts</li>
+          <li>Ask Copilot to create OPA/Rego policies</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/09-policy-as-code/remediate.py</div></div>
+          </li>
+          <li>Show the generated policies and deployment script</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run compliance-check.yml</div></div>
+          </li>
+          <li>Show the compliance check with policy enforcement</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"This is my favorite part of the demo &mdash; moving from reactive to proactive. Instead of gates that slow teams down, we're implementing guardrails that keep them safe. Copilot generates OPA/Rego policies that enforce: no public storage accounts, encryption required everywhere, minimum TLS 1.2, no wildcard RBAC roles. These policies run in CI/CD &mdash; if a developer tries to deploy an insecure configuration, the pipeline blocks it with a clear explanation of what's wrong and how to fix it. Guardrails, not gates."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/tree/main/infra/policies/" target="_blank">infra/policies/</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/infra/deploy_with_policy.sh" target="_blank">infra/deploy_with_policy.sh</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>compliance-check.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 10 -->
+  <article class="scenario-card" data-scenario="10">
+    <div class="card-header">
+      <span class="scenario-num">10</span>
+      <span class="scenario-emoji">&#x1F4CB;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Network Compliance</div>
+        <div class="scenario-subtitle">CIS/NIST/PCI-DSS compliance validation</div>
+      </div>
+      <div class="status-check" data-id="s10" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> With all the changes made today, the team needs to verify they meet regulatory compliance requirements. They run a comprehensive audit mapping every network configuration against CIS, NIST, and PCI-DSS controls.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Maps network configurations to compliance frameworks (CIS, NIST SP 800-53, PCI-DSS), generates compliance reports, and identifies remaining gaps.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/10-network-compliance/simulate.py</div></div>
+          </li>
+          <li>Show the network inventory and config files</li>
+          <li>Ask Copilot to map configs to compliance frameworks</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/10-network-compliance/remediate.py</div></div>
+          </li>
+          <li>Show the generated compliance report</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run compliance-check.yml</div></div>
+          </li>
+          <li>Show the compliance check results</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Compliance is often the most tedious part of security &mdash; mapping controls to frameworks, generating evidence, filling out spreadsheets. Copilot transforms this. It takes our network inventory and maps every configuration to CIS Azure Foundations, NIST SP 800-53, and PCI-DSS controls simultaneously. The compliance report it generates includes control IDs, evidence references, and remediation guidance for any gaps. This is audit readiness in minutes, not weeks. And because it's code, it's repeatable and versionable."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/network_inventory.json" target="_blank">vulnerable-app/network_inventory.json</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/compliance_report.md" target="_blank">vulnerable-app/compliance_report.md</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>compliance-check.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================================= -->
+<!-- ACT 5: Resolution                                             -->
+<!-- ============================================================= -->
+<section class="act-section" id="act5">
+  <div class="act-header">
+    <span class="act-num">Act 5</span>
+    <h2>&#x1F4CA; Resolution</h2>
+    <span class="act-time-label">5:00 PM</span>
+  </div>
+
+  <!-- Scenario 11 -->
+  <article class="scenario-card" data-scenario="11">
+    <div class="card-header">
+      <span class="scenario-num">11</span>
+      <span class="scenario-emoji">&#x1F41B;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Vulnerability Fix</div>
+        <div class="scenario-subtitle">OWASP Top 10 remediation in application code</div>
+      </div>
+      <div class="status-check" data-id="s11" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> The web application has multiple OWASP Top 10 vulnerabilities &mdash; SQL injection, cross-site scripting, broken authentication. The development team needs to fix these issues before the application can be safely re-deployed.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Identifies OWASP Top 10 vulnerabilities in application code, generates secure code replacements with parameterized queries, output encoding, and proper authentication flows.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/11-vulnerability-fix/simulate.py</div></div>
+          </li>
+          <li>Show the vulnerable application code in VS Code</li>
+          <li>Ask Copilot to identify and fix security vulnerabilities</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/11-vulnerability-fix/remediate.py</div></div>
+          </li>
+          <li>Show the secure code and diff</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run vulnerability-remediation.yml</div></div>
+          </li>
+          <li>Show the vulnerability remediation results</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"Let's look at the application code. This is a Flask web app with textbook OWASP Top 10 vulnerabilities. Here's a SQL injection &mdash; the query is built with string concatenation. Here's XSS &mdash; user input rendered directly in HTML without encoding. And the authentication uses MD5 with no salt. Watch what Copilot does: it rewrites the SQL queries to use parameterized statements, adds Jinja2 auto-escaping, replaces MD5 with bcrypt, and adds CSRF protection. The before and after is dramatic &mdash; every line of insecure code replaced with its secure equivalent."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/webapp/app.py" target="_blank">vulnerable-app/webapp/app.py</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/webapp/auth.py" target="_blank">vulnerable-app/webapp/auth.py</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>vulnerability-remediation.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- Scenario 12 -->
+  <article class="scenario-card" data-scenario="12">
+    <div class="card-header">
+      <span class="scenario-num">12</span>
+      <span class="scenario-emoji">&#x1F4DD;</span>
+      <div class="scenario-title-block">
+        <div class="scenario-title">Incident Report</div>
+        <div class="scenario-subtitle">Automated post-incident reporting and executive summary</div>
+      </div>
+      <div class="status-check" data-id="s12" title="Mark as done">&#x2713;</div>
+    </div>
+    <div class="card-body">
+      <div class="story-context">
+        <strong>&#x1F4AC; Story:</strong> It's 5:00 PM and Sarah needs to brief the board. The team generates a comprehensive incident report covering the full timeline, root cause analysis, remediation steps taken, and recommendations &mdash; all before the end of business.
+      </div>
+      <div class="copilot-action">
+        <span class="cp-icon">&#x2728;</span>
+        <p><strong>What Copilot Does:</strong> Generates a structured incident report following NIST guidelines, creates an executive summary for non-technical stakeholders, and produces a lessons-learned document with action items.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="demo-steps-title">&#x1F3AC; Demo Steps</div>
+        <ol class="step-list">
+          <li>Open VS Code terminal</li>
+          <li>Run the simulation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/12-incident-report/simulate.py</div></div>
+          </li>
+          <li>Show the incident data and timeline</li>
+          <li>Ask Copilot to generate the incident report</li>
+          <li>Run the remediation:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scenarios/12-incident-report/remediate.py</div></div>
+          </li>
+          <li>Show the generated incident report and executive summary</li>
+          <li>Trigger the workflow:
+            <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> gh workflow run incident-response.yml</div></div>
+          </li>
+          <li>Show the incident response workflow completion</li>
+        </ol>
+      </div>
+      <div class="notes">
+        <div class="notes-title">&#x1F3A4; Talk Track</div>
+        <p>"And here's the finale. It's 5 PM, Sarah needs to brief the board, and she needs two documents: a technical incident report and an executive summary. Copilot generates both. The technical report follows NIST SP 800-61 structure: timeline, root cause analysis, indicators of compromise, remediation actions, and lessons learned. The executive summary translates all of that into business language the board understands: what happened, what's the business impact, what did we do about it, and what are we doing to prevent it from happening again. The entire incident &mdash; from alert to board-ready report &mdash; handled in a single day with Copilot."</p>
+      </div>
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="meta-box-title">&#x1F4C2; Key Files</div>
+          <ul class="file-list">
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/incident_report.md" target="_blank">vulnerable-app/incident_report.md</a></li>
+            <li><a href="https://github.com/sautalwar/it-security-copilot-demo/blob/main/vulnerable-app/executive_summary.md" target="_blank">vulnerable-app/executive_summary.md</a></li>
+          </ul>
+        </div>
+        <div class="meta-box">
+          <div class="meta-box-title">&#x2699;&#xFE0F; Workflow</div>
+          <span class="workflow-badge"><span class="wf-dot"></span>incident-response.yml</span>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ===== SETUP / TEARDOWN PANEL ===== -->
+<section class="setup-panel">
+  <div class="setup-card">
+    <div class="setup-header" id="setupToggle">
+      <span>&#x2699;&#xFE0F;</span>
+      <h3>Setup &amp; Teardown</h3>
+    </div>
+    <div class="setup-body" id="setupBody">
+      <div class="setup-item">
+        <div class="setup-label">&#x1F680; Initialize Demo</div>
+        <div class="setup-desc">Set up the demo environment and generate vulnerable files</div>
+        <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scripts/setup.py</div></div>
+      </div>
+      <div class="setup-item">
+        <div class="setup-label">&#x25B6;&#xFE0F; Run All Scenarios</div>
+        <div class="setup-desc">Automated run of all 12 scenarios sequentially</div>
+        <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scripts/demo_runner.py</div></div>
+      </div>
+      <div class="setup-item">
+        <div class="setup-label">&#x1F504; Reset Demo</div>
+        <div class="setup-desc">Clean up generated files and reset to initial state</div>
+        <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scripts/teardown.py</div></div>
+      </div>
+      <div class="setup-item">
+        <div class="setup-label">&#x1F4A5; Hard Reset</div>
+        <div class="setup-desc">Full cleanup including git reset and branch cleanup</div>
+        <div class="cmd-block"><div class="cmd-bar"><div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div><button class="copy-btn" onclick="copyCmd(this)">Copy</button></div><div class="cmd-body"><span class="prompt">$</span> python scripts/teardown.py --hard</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="footer-items">
+    <span>Built with &#x2728; GitHub Copilot</span>
+    <a href="https://github.com/sautalwar/it-security-copilot-demo" target="_blank">sautalwar/it-security-copilot-demo</a>
+    <span>Press <span class="kbd">N</span> to toggle presenter notes</span>
+    <span><span class="kbd">T</span> timer &middot; <span class="kbd">1</span>-<span class="kbd">5</span> jump to act &middot; <span class="kbd">Esc</span> collapse</span>
+  </div>
+</footer>
+
+<!-- Keyboard Shortcuts Hint -->
+<div class="shortcuts-hint">
+  <span class="kbd">N</span> notes &middot;
+  <span class="kbd">T</span> timer &middot;
+  <span class="kbd">1</span>-<span class="kbd">5</span> acts &middot;
+  <span class="kbd">Esc</span> collapse
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---- State ----
+  var notesVisible = false;
+  var timerRunning = false;
+  var timerStartTime = 0;
+  var timerElapsed = 0;
+  var timerInterval = null;
+  var STORAGE_KEY = 'itsec-demo-state';
+
+  // ---- Helpers ----
+  function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+  function $$(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return { completed: {} };
+  }
+
+  function saveState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  }
+
+  // ---- Notes Toggle ----
+  function toggleNotes() {
+    notesVisible = !notesVisible;
+    var notes = $$('.notes');
+    for (var i = 0; i < notes.length; i++) {
+      if (notesVisible) {
+        notes[i].classList.add('visible');
+      } else {
+        notes[i].classList.remove('visible');
+      }
+    }
+    var btn = $('#notesToggle');
+    if (btn) {
+      if (notesVisible) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  }
+
+  // ---- Timer ----
+  function formatTime(ms) {
+    var totalSec = Math.floor(ms / 1000);
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    return (h < 10 ? '0' : '') + h + ':' +
+           (m < 10 ? '0' : '') + m + ':' +
+           (s < 10 ? '0' : '') + s;
+  }
+
+  function updateTimerDisplay() {
+    var el = $('#timer');
+    if (!el) return;
+    var now = timerRunning ? (Date.now() - timerStartTime + timerElapsed) : timerElapsed;
+    el.textContent = formatTime(now);
+  }
+
+  function toggleTimer() {
+    var el = $('#timer');
+    if (timerRunning) {
+      timerElapsed += Date.now() - timerStartTime;
+      timerRunning = false;
+      clearInterval(timerInterval);
+      if (el) el.classList.remove('running');
+    } else {
+      timerStartTime = Date.now();
+      timerRunning = true;
+      timerInterval = setInterval(updateTimerDisplay, 500);
+      if (el) el.classList.add('running');
+    }
+    updateTimerDisplay();
+  }
+
+  // ---- Progress ----
+  function updateProgress() {
+    var state = loadState();
+    var completed = Object.keys(state.completed).length;
+    var total = 12;
+    var pct = Math.round((completed / total) * 100);
+    var fill = $('#progressFill');
+    var text = $('#progressText');
+    if (fill) fill.style.width = pct + '%';
+    if (text) text.textContent = completed + ' / ' + total + ' done';
+  }
+
+  // ---- Scenario Completion ----
+  function initCompletionChecks() {
+    var state = loadState();
+    var checks = $$('.status-check');
+    for (var i = 0; i < checks.length; i++) {
+      var check = checks[i];
+      var id = check.getAttribute('data-id');
+      if (state.completed[id]) {
+        check.classList.add('checked');
+        var card = check.closest('.scenario-card');
+        if (card) card.classList.add('done');
+      }
+      check.addEventListener('click', (function(chk, cid) {
+        return function(e) {
+          e.stopPropagation();
+          var st = loadState();
+          if (st.completed[cid]) {
+            delete st.completed[cid];
+            chk.classList.remove('checked');
+            var c = chk.closest('.scenario-card');
+            if (c) c.classList.remove('done');
+          } else {
+            st.completed[cid] = true;
+            chk.classList.add('checked');
+            var c2 = chk.closest('.scenario-card');
+            if (c2) c2.classList.add('done');
+          }
+          saveState(st);
+          updateProgress();
+        };
+      })(check, id));
+    }
+    updateProgress();
+  }
+
+  // ---- Timeline Navigation ----
+  function initTimeline() {
+    var acts = $$('.timeline-act');
+    for (var i = 0; i < acts.length; i++) {
+      acts[i].addEventListener('click', function() {
+        var target = this.getAttribute('data-act');
+        var section = document.getElementById(target);
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+
+    // Highlight active act on scroll
+    var sections = $$('.act-section');
+    function onScroll() {
+      var scrollY = window.scrollY || window.pageYOffset;
+      var barHeight = 70;
+      var current = '';
+      for (var i = 0; i < sections.length; i++) {
+        var rect = sections[i].getBoundingClientRect();
+        if (rect.top <= barHeight + 100) {
+          current = sections[i].id;
+        }
+      }
+      for (var j = 0; j < acts.length; j++) {
+        if (acts[j].getAttribute('data-act') === current) {
+          acts[j].classList.add('active');
+        } else {
+          acts[j].classList.remove('active');
+        }
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  // ---- Keyboard Shortcuts ----
+  function initKeyboard() {
+    document.addEventListener('keydown', function(e) {
+      // Ignore when typing in inputs
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      var key = e.key;
+
+      if (key === 'n' || key === 'N') {
+        e.preventDefault();
+        toggleNotes();
+      } else if (key === 't' || key === 'T') {
+        e.preventDefault();
+        toggleTimer();
+      } else if (key === 'Escape') {
+        e.preventDefault();
+        // Collapse notes if visible
+        if (notesVisible) toggleNotes();
+      } else if (key >= '1' && key <= '5') {
+        e.preventDefault();
+        var section = document.getElementById('act' + key);
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+
+  // ---- Copy to Clipboard ----
+  window.copyCmd = function(btn) {
+    var block = btn.closest('.cmd-block');
+    if (!block) return;
+    var body = block.querySelector('.cmd-body');
+    if (!body) return;
+    var text = body.textContent.replace(/^\$\s*/, '').trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    } else {
+      // Fallback
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 1500);
+      } catch(err) {}
+      document.body.removeChild(ta);
+    }
+  };
+
+  // ---- Notes Toggle Button ----
+  function initNotesButton() {
+    var btn = $('#notesToggle');
+    if (btn) btn.addEventListener('click', toggleNotes);
+  }
+
+  // ---- Timer Click ----
+  function initTimerClick() {
+    var el = $('#timer');
+    if (el) el.addEventListener('click', toggleTimer);
+  }
+
+  // ---- Card Header Toggle (expand/collapse body) ----
+  function initCardToggle() {
+    var headers = $$('.card-header');
+    for (var i = 0; i < headers.length; i++) {
+      (function(header) {
+        var card = header.closest('.scenario-card');
+        if (!card) return;
+        var body = card.querySelector('.card-body');
+        if (!body) return;
+
+        header.addEventListener('click', function(e) {
+          // Don't toggle if clicking the checkbox
+          if (e.target.classList.contains('status-check')) return;
+
+          var isHidden = body.style.display === 'none';
+          body.style.display = isHidden ? 'block' : 'none';
+        });
+      })(headers[i]);
+    }
+  }
+
+  // ---- Setup Toggle ----
+  function initSetupToggle() {
+    var toggle = $('#setupToggle');
+    var body = $('#setupBody');
+    if (toggle && body) {
+      var collapsed = false;
+      toggle.addEventListener('click', function() {
+        collapsed = !collapsed;
+        body.style.display = collapsed ? 'none' : 'grid';
+      });
+    }
+  }
+
+  // ---- Init ----
+  function init() {
+    initCompletionChecks();
+    initTimeline();
+    initKeyboard();
+    initNotesButton();
+    initTimerClick();
+    initCardToggle();
+    initSetupToggle();
+    updateTimerDisplay();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+})();
+</script>
+</body>
+</html>
