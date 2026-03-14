@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GHAS + Custom Security Agent — Complete Coverage</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--text-muted:#8b949e;
+    --green:#3fb950;--green-bg:rgba(63,185,80,.12);
+    --yellow:#d29922;--yellow-bg:rgba(210,153,34,.12);
+    --purple:#bc8cff;--purple-bg:rgba(188,140,255,.12);
+    --blue:#58a6ff;--blue-bg:rgba(88,166,255,.12);
+    --red:#f85149;--red-bg:rgba(248,81,73,.12);
+    --accent:#58a6ff;
+  }
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;line-height:1.6;overflow-x:hidden}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* Layout */
+  .container{max-width:1200px;margin:0 auto;padding:0 24px}
+  section{padding:48px 0;border-bottom:1px solid var(--border)}
+  section:last-of-type{border-bottom:none}
+
+  /* Header */
+  .hero{text-align:center;padding:64px 0 48px;border-bottom:1px solid var(--border);position:relative}
+  .hero h1{font-size:2.4rem;font-weight:800;margin-bottom:8px;background:linear-gradient(135deg,var(--green),var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero .subtitle{font-size:1.15rem;color:var(--text-muted);max-width:700px;margin:0 auto 24px}
+  .notes-toggle{position:fixed;top:16px;right:16px;z-index:1000;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:6px;transition:all .2s}
+  .notes-toggle:hover{border-color:var(--accent);color:var(--text)}
+  .notes-toggle .kbd{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:.75rem;font-family:monospace}
+
+  /* Navigation */
+  nav.toc{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:999;background:var(--surface);border:1px solid var(--border);border-left:none;border-radius:0 8px 8px 0;padding:12px 8px;display:flex;flex-direction:column;gap:4px}
+  nav.toc a{display:block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:6px;font-size:.75rem;font-weight:700;color:var(--text-muted);transition:all .15s}
+  nav.toc a:hover,nav.toc a.active{background:var(--accent);color:#fff;text-decoration:none}
+
+  /* Section headers */
+  .section-header{margin-bottom:32px}
+  .section-header .section-num{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:6px}
+  .section-header h2{font-size:1.8rem;font-weight:700}
+  .section-header p{color:var(--text-muted);margin-top:8px;max-width:800px}
+
+  /* Notes (talk track) */
+  .notes{background:linear-gradient(135deg,rgba(88,166,255,.06),rgba(188,140,255,.06));border:1px solid rgba(88,166,255,.2);border-radius:10px;padding:20px 24px;margin:24px 0;display:none;position:relative}
+  .notes::before{content:'🎤 TALK TRACK';font-size:.7rem;font-weight:700;letter-spacing:2px;color:var(--accent);position:absolute;top:-10px;left:16px;background:var(--bg);padding:0 8px}
+  .notes p{color:var(--text-muted);font-style:italic;line-height:1.7}
+  body.show-notes .notes{display:block}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;white-space:nowrap}
+  .badge-green{background:var(--green-bg);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+  .badge-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid rgba(210,153,34,.3)}
+  .badge-purple{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(188,140,255,.3)}
+  .badge-red{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+  .badge-blue{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(88,166,255,.3)}
+  .badge-lg{font-size:.88rem;padding:6px 16px;border-radius:24px}
+
+  /* Cards */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;transition:border-color .2s}
+  .card:hover{border-color:var(--accent)}
+
+  /* Coverage map cards */
+  .coverage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:24px}
+  .cov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:transform .15s,border-color .2s}
+  .cov-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .cov-card-header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .cov-card-num{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem}
+  .cov-card-num.green{background:var(--green-bg);color:var(--green)}
+  .cov-card-num.yellow{background:var(--yellow-bg);color:var(--yellow)}
+  .cov-card-num.purple{background:var(--purple-bg);color:var(--purple)}
+  .cov-card-title{font-weight:700;font-size:1rem;flex:1}
+  .cov-card-icon{font-size:1.2rem}
+  .cov-card-body{padding:16px 20px}
+  .cov-card-body .field-label{font-size:.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:4px;font-weight:600}
+  .cov-card-body .field-value{font-size:.88rem;color:var(--text);margin-bottom:12px;line-height:1.5}
+  .cov-card-body .field-value:last-child{margin-bottom:0}
+  .cov-card.border-green{border-left:3px solid var(--green)}
+  .cov-card.border-yellow{border-left:3px solid var(--yellow)}
+  .cov-card.border-purple{border-left:3px solid var(--purple)}
+
+  /* OWASP table */
+  .styled-table{width:100%;border-collapse:collapse;margin-top:16px;font-size:.9rem}
+  .styled-table th{text-align:left;padding:12px 16px;background:rgba(88,166,255,.06);border-bottom:2px solid var(--border);font-size:.78rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted)}
+  .styled-table td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top}
+  .styled-table tr:hover td{background:rgba(88,166,255,.03)}
+  .styled-table .owasp-id{font-weight:700;color:var(--accent);white-space:nowrap}
+
+  /* IT Security domains grid */
+  .domain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
+  .domain-item{display:flex;align-items:flex-start;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .domain-item .icon-col{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:48px}
+  .domain-item .ghas-x{color:var(--red);font-weight:700;font-size:.85rem}
+  .domain-item .agent-check{color:var(--green);font-weight:700;font-size:.85rem}
+  .domain-item .domain-name{font-weight:600;font-size:.92rem}
+  .domain-item .domain-desc{font-size:.82rem;color:var(--text-muted);margin-top:2px}
+
+  /* Architecture diagram */
+  .arch-diagram{display:flex;flex-direction:column;align-items:center;gap:0;margin:32px 0}
+  .arch-box{border:2px solid;border-radius:12px;padding:20px 28px;text-align:center;position:relative;width:100%;max-width:560px}
+  .arch-box h4{font-size:.95rem;margin-bottom:6px}
+  .arch-box ul{list-style:none;text-align:left;font-size:.85rem;color:var(--text-muted)}
+  .arch-box ul li::before{content:'• ';color:var(--accent)}
+  .arch-box.prompt{border-color:var(--blue);background:rgba(88,166,255,.04)}
+  .arch-box.agent{border-color:var(--purple);background:rgba(188,140,255,.04)}
+  .arch-box.output{border-color:var(--green);background:rgba(63,185,80,.04)}
+  .arch-arrow{font-size:1.6rem;color:var(--text-muted);margin:4px 0;line-height:1}
+  .arch-arrow-label{font-size:.75rem;color:var(--text-muted);margin-bottom:4px}
+
+  /* Code blocks */
+  .code-block{position:relative;margin:16px 0}
+  .code-block pre{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:16px 20px;overflow-x:auto;font-size:.84rem;line-height:1.6;font-family:'Cascadia Code','Fira Code',Consolas,monospace;color:var(--text)}
+  .code-block .lang-label{position:absolute;top:0;right:0;background:var(--border);color:var(--text-muted);font-size:.68rem;padding:2px 10px;border-radius:0 10px 0 8px;font-weight:600;text-transform:uppercase}
+  .copy-btn{position:absolute;top:8px;right:80px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.75rem;opacity:0;transition:opacity .2s}
+  .code-block:hover .copy-btn{opacity:1}
+  .copy-btn:hover{border-color:var(--accent);color:var(--text)}
+  .copy-btn.copied{color:var(--green);border-color:var(--green)}
+
+  /* Defense layers */
+  .defense-layers{display:flex;justify-content:center;margin:32px 0}
+  .layer{border:2px solid;border-radius:14px;padding:20px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .layer h4{font-size:.88rem;margin-bottom:4px}
+  .layer p{font-size:.78rem;color:var(--text-muted);max-width:300px}
+  .layer-1{border-color:var(--green);background:rgba(63,185,80,.04);padding:24px 32px}
+  .layer-2{border-color:var(--blue);background:rgba(88,166,255,.03);padding:24px 32px 28px}
+  .layer-3{border-color:var(--yellow);background:rgba(210,153,34,.03);padding:24px 32px 28px}
+  .layer-4{border-color:var(--purple);background:rgba(188,140,255,.03);padding:24px 32px 28px}
+  .layer-tag{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px}
+
+  /* ROI table */
+  .roi-table{width:100%;border-collapse:collapse;margin-top:16px}
+  .roi-table th{text-align:left;padding:12px 16px;background:rgba(63,185,80,.06);border-bottom:2px solid var(--border);font-size:.78rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted)}
+  .roi-table td{padding:14px 16px;border-bottom:1px solid var(--border)}
+  .roi-table tr:hover td{background:rgba(63,185,80,.03)}
+  .roi-table .metric{font-weight:600}
+  .roi-table .without{color:var(--red)}
+  .roi-table .with{color:var(--green)}
+  .roi-table .savings{color:var(--yellow);font-weight:600}
+
+  /* Demo steps */
+  .demo-flow{display:grid;grid-template-columns:1fr;gap:24px;margin-top:24px}
+  .demo-part{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .demo-part-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  .demo-part-header .part-badge{padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:700}
+  .demo-part-header h4{font-size:1rem}
+  .demo-part-body{padding:16px 20px}
+  .demo-part-body ol{padding-left:24px;font-size:.9rem;color:var(--text-muted)}
+  .demo-part-body ol li{margin-bottom:8px;line-height:1.5}
+  .demo-part-body ol li strong{color:var(--text)}
+  .demo-part-body .quote{border-left:3px solid var(--accent);padding-left:12px;color:var(--text);font-style:italic;margin-top:8px}
+
+  /* GHAS Setup */
+  .setup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:24px}
+  .setup-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+  .setup-card h4{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:1rem}
+  .setup-card h4 .icon{font-size:1.2rem}
+  .setup-card ul{list-style:none;font-size:.88rem;color:var(--text-muted)}
+  .setup-card ul li{padding:4px 0;padding-left:18px;position:relative}
+  .setup-card ul li::before{content:'→';position:absolute;left:0;color:var(--accent)}
+
+  /* Collapsible */
+  .collapsible{cursor:pointer;user-select:none}
+  .collapsible::after{content:' ▾';font-size:.8em;color:var(--text-muted)}
+  .collapsible.collapsed::after{content:' ▸'}
+  .collapsible-content{overflow:hidden;transition:max-height .3s ease}
+  .collapsible-content.collapsed{max-height:0 !important;overflow:hidden}
+
+  /* Footer */
+  footer{text-align:center;padding:48px 0;border-top:1px solid var(--border);color:var(--text-muted)}
+  footer .tagline{font-size:1.1rem;color:var(--text);margin-bottom:8px;font-weight:600}
+  footer .links{margin-top:16px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap}
+  footer .links a{font-size:.88rem}
+  footer .hint{margin-top:16px;font-size:.78rem;color:var(--text-muted)}
+
+  /* Summary stat row */
+  .stat-row{display:flex;gap:16px;flex-wrap:wrap;margin:24px 0}
+  .stat-box{flex:1;min-width:140px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center}
+  .stat-box .stat-num{font-size:1.8rem;font-weight:800}
+  .stat-box .stat-label{font-size:.78rem;color:var(--text-muted);margin-top:4px}
+  .stat-box.s-green .stat-num{color:var(--green)}
+  .stat-box.s-yellow .stat-num{color:var(--yellow)}
+  .stat-box.s-purple .stat-num{color:var(--purple)}
+
+  /* Prompt file examples */
+  .prompt-file{margin-bottom:16px}
+  .prompt-file-header{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--border);border-radius:10px 10px 0 0;font-size:.82rem;font-family:monospace;color:var(--text-muted)}
+  .prompt-file-header .file-icon{color:var(--accent)}
+  .prompt-file pre{border-radius:0 0 10px 10px;margin-top:0;border-top:none}
+
+  /* Responsive */
+  @media(max-width:768px){
+    .hero h1{font-size:1.6rem}
+    .coverage-grid{grid-template-columns:1fr}
+    nav.toc{display:none}
+    .container{padding:0 16px}
+    .defense-layers .layer{padding:12px 16px}
+  }
+</style>
+</head>
+<body>
+<!-- Notes Toggle -->
+<button class="notes-toggle" onclick="toggleNotes()" title="Toggle presenter notes (N)">
+  🎤 Notes <span class="kbd">N</span>
+</button>
+
+<!-- Side Navigation -->
+<nav class="toc" id="toc">
+  <a href="#section-1" title="The Reality Check">1</a>
+  <a href="#section-2" title="Coverage Map">2</a>
+  <a href="#section-3" title="How It Works">3</a>
+  <a href="#section-4" title="Workflow">4</a>
+  <a href="#section-5" title="GHAS Setup">5</a>
+  <a href="#section-6" title="Defense in Depth">6</a>
+  <a href="#section-7" title="Customer ROI">7</a>
+  <a href="#section-8" title="Demo Sequence">8</a>
+</nav>
+
+<!-- ======================= HERO ======================= -->
+<header class="hero container">
+  <h1>GHAS + Custom Security Agent — Complete Coverage</h1>
+  <p class="subtitle">What GitHub Advanced Security handles natively vs. what needs a custom intelligent agent</p>
+  <div class="stat-row">
+    <div class="stat-box s-green">
+      <div class="stat-num">2</div>
+      <div class="stat-label">GHAS Built-in</div>
+    </div>
+    <div class="stat-box s-yellow">
+      <div class="stat-num">2</div>
+      <div class="stat-label">GHAS Partial</div>
+    </div>
+    <div class="stat-box s-purple">
+      <div class="stat-num">8</div>
+      <div class="stat-label">Custom Agent</div>
+    </div>
+  </div>
+</header>
+
+<!-- ================ SECTION 1: Reality Check ================ -->
+<section id="section-1">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 1</div>
+    <h2>The Reality Check</h2>
+    <p>Why GHAS alone isn't enough — and why a custom agent alone isn't either.</p>
+  </div>
+
+  <div class="notes">
+    <p>"Customers often ask — why do I need a custom agent if I have GHAS? Great question. GHAS is incredibly powerful for code-level and supply-chain security. But enterprise security goes far beyond source code. You have networks, infrastructure, compliance, VPNs, firewalls, SIEM — GHAS wasn't designed for those. That's where the custom agent comes in. Let me show you exactly where the line is."</p>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <p style="font-size:1.05rem;line-height:1.8">
+      <strong>GitHub Advanced Security (GHAS)</strong> is best-in-class for <span class="badge badge-green">code security</span> and
+      <span class="badge badge-green">supply chain security</span>. It catches SQL injection, XSS, leaked secrets, and vulnerable dependencies
+      <em>at the source</em> — before code ever reaches production.
+    </p>
+    <p style="font-size:1.05rem;line-height:1.8;margin-top:16px">
+      But enterprise IT security spans far more than source code. <span class="badge badge-purple">Network monitoring</span>,
+      <span class="badge badge-purple">infrastructure auditing</span>, <span class="badge badge-purple">compliance frameworks</span>,
+      and <span class="badge badge-purple">incident response</span> live outside the codebase — in DNS logs, firewall rules,
+      VPN configs, and SIEM platforms. GHAS wasn't designed for those domains.
+    </p>
+    <p style="font-size:1.05rem;line-height:1.8;margin-top:16px;color:var(--accent);font-weight:600">
+      The answer isn't GHAS <em>or</em> a custom agent. It's GHAS <strong>+</strong> a custom agent, each covering what the other can't.
+    </p>
+  </div>
+</div>
+</section>
+
+<!-- ================ SECTION 2: Coverage Map ================ -->
+<section id="section-2">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 2</div>
+    <h2>The Coverage Map — GHAS vs Custom Agent</h2>
+    <p>All 12 demo scenarios with clear ownership. Green = GHAS built-in. Yellow = partial. Purple = custom agent required.</p>
+  </div>
+
+  <div class="notes">
+    <p>"Let's walk through each use case. You'll see a clear pattern: anything that lives in the code or dependency graph — GHAS owns it. Anything that lives in network infrastructure, operational configs, or compliance — that's custom agent territory."</p>
+  </div>
+
+  <!-- Coverage Cards -->
+  <div class="coverage-grid">
+
+    <!-- Card 1: DNS Exfiltration -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">01</div>
+        <div class="cov-card-title">DNS Exfiltration Detection</div>
+        <div class="cov-card-icon">🌐</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't monitor network traffic</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Runs scheduled DNS log analysis, detects tunneling via entropy analysis, alerts on C2 patterns</div>
+      </div>
+    </div>
+
+    <!-- Card 2: KQL/SIEM -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">02</div>
+        <div class="cov-card-title">KQL / SIEM Investigation</div>
+        <div class="cov-card-icon">🔍</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't generate SIEM queries</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Auto-generates KQL detection queries, correlates events across DNS/auth/network data sources</div>
+      </div>
+    </div>
+
+    <!-- Card 3: Firewall -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">03</div>
+        <div class="cov-card-title">Firewall Containment</div>
+        <div class="cov-card-icon">🔥</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't manage network infrastructure</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Validates firewall rules against CIS benchmarks, detects overly permissive rules, generates hardened configs</div>
+      </div>
+    </div>
+
+    <!-- Card 4: Network Forensics -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">04</div>
+        <div class="cov-card-title">Network Forensics</div>
+        <div class="cov-card-icon">🔬</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't analyze network captures</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">IOC extraction, timeline reconstruction, forensic reports with chain of custody documentation</div>
+      </div>
+    </div>
+
+    <!-- Card 5: Secret Exposure -->
+    <div class="cov-card border-green">
+      <div class="cov-card-header">
+        <div class="cov-card-num green">05</div>
+        <div class="cov-card-title">Secret Exposure</div>
+        <div class="cov-card-icon">🔑</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-green badge-lg">🟢 GHAS BUILT-IN</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value"><strong>Secret Scanning + Push Protection</strong> — detects 200+ secret types, blocks pushes containing secrets</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value" style="color:var(--text-muted)">Agent NOT needed — GHAS handles this natively. Just enable Secret Scanning and Push Protection. We literally got blocked by push protection when we tried to push fake secrets!</div>
+      </div>
+    </div>
+
+    <!-- Card 6: IaC Hardening -->
+    <div class="cov-card border-yellow">
+      <div class="cov-card-header">
+        <div class="cov-card-num yellow">06</div>
+        <div class="cov-card-title">IaC Hardening</div>
+        <div class="cov-card-icon">🏗️</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-yellow badge-lg">🟡 GHAS PARTIAL</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value"><strong>CodeQL</strong> has some IaC queries for Terraform/CloudFormation</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Adds DEEP CIS benchmark scanning for Bicep/Terraform — encryption at rest, private endpoints, managed identity, diagnostic settings, NSG associations</div>
+      </div>
+    </div>
+
+    <!-- Card 7: WAF & Zero Trust -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">07</div>
+        <div class="cov-card-title">WAF &amp; Zero Trust</div>
+        <div class="cov-card-icon">🛡️</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't audit WAF configurations</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Validates OWASP CRS enablement, checks network segmentation, verifies Zero Trust microsegmentation rules</div>
+      </div>
+    </div>
+
+    <!-- Card 8: VPN Audit -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">08</div>
+        <div class="cov-card-title">VPN Audit</div>
+        <div class="cov-card-icon">🔒</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't check VPN configurations</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Detects weak crypto (DES, MD5, DH Group 1), expired certificates, missing MFA, split tunneling risks</div>
+      </div>
+    </div>
+
+    <!-- Card 9: Policy-as-Code -->
+    <div class="cov-card border-yellow">
+      <div class="cov-card-header">
+        <div class="cov-card-num yellow">09</div>
+        <div class="cov-card-title">Policy-as-Code</div>
+        <div class="cov-card-icon">📜</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-yellow badge-lg">🟡 GHAS PARTIAL</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value"><strong>Branch protection rules, rulesets, required status checks</strong></div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Enforces OPA/Rego policies, Sentinel policies, custom deployment gates beyond what GHAS rulesets cover</div>
+      </div>
+    </div>
+
+    <!-- Card 10: Network Compliance -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">10</div>
+        <div class="cov-card-title">Network Compliance</div>
+        <div class="cov-card-icon">📋</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't do network compliance</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Monitors CIS, NIST 800-53, PCI-DSS compliance for network infrastructure — switches, routers, SNMP, syslog</div>
+      </div>
+    </div>
+
+    <!-- Card 11: Vulnerability Fix -->
+    <div class="cov-card border-green">
+      <div class="cov-card-header">
+        <div class="cov-card-num green">11</div>
+        <div class="cov-card-title">Vulnerability Fix (OWASP)</div>
+        <div class="cov-card-icon">🐛</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-green badge-lg">🟢 GHAS BUILT-IN</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value"><strong>CodeQL Code Scanning</strong> — detects SQLi, XSS, command injection, path traversal, insecure deserialization + <strong>Dependabot</strong> for dependency CVEs</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value" style="color:var(--text-muted)">Agent NOT needed for detection — CodeQL catches these. Agent can enhance by auto-generating fix PRs with Copilot-suggested remediations</div>
+      </div>
+    </div>
+
+    <!-- Card 12: Incident Report -->
+    <div class="cov-card border-purple">
+      <div class="cov-card-header">
+        <div class="cov-card-num purple">12</div>
+        <div class="cov-card-title">Incident Report</div>
+        <div class="cov-card-icon">📊</div>
+      </div>
+      <div class="cov-card-body">
+        <span class="badge badge-purple badge-lg">🔴 CUSTOM AGENT</span>
+        <div class="field-label" style="margin-top:12px">GHAS Feature</div>
+        <div class="field-value" style="color:var(--text-muted)">N/A — GHAS doesn't generate executive reports</div>
+        <div class="field-label">Custom Agent Role</div>
+        <div class="field-value">Correlates all findings, generates executive incident reports, MITRE ATT&CK mapping, board-ready summaries</div>
+      </div>
+    </div>
+
+  </div><!-- /coverage-grid -->
+
+  <!-- OWASP Top 10 -->
+  <h3 class="collapsible" style="margin-top:48px;font-size:1.3rem;cursor:pointer" onclick="toggleCollapse(this)">OWASP Top 10 (2021) — Combined Coverage</h3>
+  <div class="collapsible-content" style="max-height:2000px">
+    <p style="color:var(--text-muted);margin:12px 0">How GHAS and the custom agent together cover every OWASP Top 10 category.</p>
+    <div style="overflow-x:auto">
+    <table class="styled-table">
+      <thead>
+        <tr><th>OWASP</th><th>Risk</th><th>GHAS</th><th>Custom Agent</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="owasp-id">A01</td>
+          <td>Broken Access Control</td>
+          <td><span class="badge badge-green">🟢 CodeQL</span> detects missing auth checks</td>
+          <td>Validates RBAC policies in IaC</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A02</td>
+          <td>Cryptographic Failures</td>
+          <td><span class="badge badge-yellow">🟡 CodeQL</span> finds some weak crypto in code</td>
+          <td>Audits TLS configs, VPN crypto, certificate management</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A03</td>
+          <td>Injection (SQLi, XSS)</td>
+          <td><span class="badge badge-green">🟢 CodeQL</span> strongest area — comprehensive</td>
+          <td style="color:var(--text-muted)">—</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A04</td>
+          <td>Insecure Design</td>
+          <td><span class="badge badge-yellow">🟡 CodeQL</span> some design pattern checks</td>
+          <td>Validates architecture patterns (Zero Trust, segmentation)</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A05</td>
+          <td>Security Misconfiguration</td>
+          <td><span class="badge badge-yellow">🟡 CodeQL</span> code-level misconfig</td>
+          <td>Deep IaC / infra / network misconfiguration scanning</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A06</td>
+          <td>Vulnerable Components</td>
+          <td><span class="badge badge-green">🟢 Dependabot</span> + dependency graph + SBOM</td>
+          <td style="color:var(--text-muted)">—</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A07</td>
+          <td>Auth &amp; Session Failures</td>
+          <td><span class="badge badge-green">🟢 CodeQL</span> weak sessions, missing CSRF</td>
+          <td>Checks identity provider configs</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A08</td>
+          <td>Software &amp; Data Integrity</td>
+          <td><span class="badge badge-green">🟢 Dependabot</span> alerts + signed commits</td>
+          <td>Validates deployment pipeline integrity</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A09</td>
+          <td>Logging &amp; Monitoring Failures</td>
+          <td><span class="badge badge-red">🔴 No coverage</span></td>
+          <td>Validates diagnostic settings, syslog forwarding, SIEM integration</td>
+        </tr>
+        <tr>
+          <td class="owasp-id">A10</td>
+          <td>Server-Side Request Forgery</td>
+          <td><span class="badge badge-green">🟢 CodeQL</span> detects SSRF patterns</td>
+          <td>Validates network segmentation to limit SSRF impact</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Additional IT Security Domains -->
+  <h3 class="collapsible" style="margin-top:40px;font-size:1.3rem;cursor:pointer" onclick="toggleCollapse(this)">Additional IT Security Domains (Beyond OWASP)</h3>
+  <div class="collapsible-content" style="max-height:2000px">
+    <p style="color:var(--text-muted);margin:12px 0">Everything outside of code and supply chain — entirely custom agent territory.</p>
+    <div class="domain-grid">
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">Network Segmentation</div><div class="domain-desc">Validates VNet/subnet isolation, NSG rules</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">DNS Security</div><div class="domain-desc">Monitors for tunneling, exfiltration, C2</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">Firewall Management</div><div class="domain-desc">Audits rules, detects stale/permissive entries</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">VPN Security</div><div class="domain-desc">Crypto audit, cert expiry, split tunnel risks</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">Compliance (CIS/NIST/PCI)</div><div class="domain-desc">Continuous benchmark monitoring</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">Incident Response</div><div class="domain-desc">Automated timeline, IOCs, executive reports</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">SIEM Integration</div><div class="domain-desc">KQL query generation, event correlation</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">WAF Management</div><div class="domain-desc">OWASP CRS validation, bot protection audit</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">Certificate Management</div><div class="domain-desc">Expiry monitoring, weak algorithm detection</div></div>
+      </div>
+      <div class="domain-item">
+        <div class="icon-col"><span class="ghas-x">GHAS ✗</span><span class="agent-check">Agent ✓</span></div>
+        <div><div class="domain-name">Cloud Posture (CSPM)</div><div class="domain-desc">Azure/AWS resource hardening verification</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes" style="margin-top:32px">
+    <p>"See the pattern? GHAS owns the code and supply chain layer — it's world-class at that. But once you step outside the codebase into networks, infrastructure, and operations — that's all custom agent territory. Together, they give you complete coverage."</p>
+  </div>
+
+  <!-- Quick reference summary -->
+  <div class="card" style="margin-top:24px;padding:20px 24px">
+    <h4 style="margin-bottom:12px">📌 Quick Reference: Who Owns What?</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <h5 style="color:var(--green);margin-bottom:8px;font-size:.85rem;text-transform:uppercase;letter-spacing:1px">🟢 GHAS Owns</h5>
+        <ul style="list-style:none;font-size:.88rem;color:var(--text-muted)">
+          <li style="padding:3px 0">✓ Secret detection &amp; push protection</li>
+          <li style="padding:3px 0">✓ Code vulnerability scanning (CodeQL)</li>
+          <li style="padding:3px 0">✓ Dependency CVE alerts (Dependabot)</li>
+          <li style="padding:3px 0">✓ SBOM &amp; dependency graph</li>
+          <li style="padding:3px 0">✓ AI-powered code fix suggestions</li>
+          <li style="padding:3px 0">✓ Branch protection &amp; rulesets</li>
+        </ul>
+      </div>
+      <div>
+        <h5 style="color:var(--purple);margin-bottom:8px;font-size:.85rem;text-transform:uppercase;letter-spacing:1px">🟣 Custom Agent Owns</h5>
+        <ul style="list-style:none;font-size:.88rem;color:var(--text-muted)">
+          <li style="padding:3px 0">✓ DNS/network threat monitoring</li>
+          <li style="padding:3px 0">✓ Firewall &amp; VPN security auditing</li>
+          <li style="padding:3px 0">✓ Deep IaC/CIS benchmark scanning</li>
+          <li style="padding:3px 0">✓ Compliance framework monitoring</li>
+          <li style="padding:3px 0">✓ SIEM/KQL query generation</li>
+          <li style="padding:3px 0">✓ Incident response &amp; reporting</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ================ SECTION 3: How the Custom Agent Works ================ -->
+<section id="section-3">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 3</div>
+    <h2>How the Custom Agent Works</h2>
+    <p>Prompt files as a version-controlled knowledge base, evaluated by a GitHub Actions workflow.</p>
+  </div>
+
+  <div class="notes">
+    <p>"This is the magic — the agent's intelligence comes from these prompt files. They're written in plain English mixed with specific thresholds and patterns. Your security team maintains them like they maintain runbooks. When a new threat emerges, you update the prompt file, push it, and the agent immediately knows about it. No redeployment, no new tooling — just a markdown file update."</p>
+  </div>
+
+  <!-- Architecture Diagram -->
+  <div class="arch-diagram">
+    <div class="arch-box prompt">
+      <h4 style="color:var(--blue)">📄 Prompt Files (.github/security-agent/)</h4>
+      <ul>
+        <li>dns-security-rules.md</li>
+        <li>iac-cis-benchmarks.md</li>
+        <li>vpn-crypto-standards.md</li>
+        <li>compliance-frameworks.md</li>
+        <li>network-forensics.md</li>
+        <li>firewall-best-practices.md</li>
+      </ul>
+    </div>
+    <div>
+      <div class="arch-arrow">▼</div>
+      <div class="arch-arrow-label">Agent reads these as its "knowledge base"</div>
+    </div>
+    <div class="arch-box agent">
+      <h4 style="color:var(--purple)">🤖 Custom Security Agent (GitHub Actions Workflow)</h4>
+      <ul>
+        <li>1. Reads prompt files</li>
+        <li>2. Scans target configs / logs</li>
+        <li>3. Evaluates against rules</li>
+        <li>4. Generates findings report</li>
+        <li>5. Creates issues / PRs for fixes</li>
+      </ul>
+    </div>
+    <div>
+      <div class="arch-arrow">▼</div>
+      <div class="arch-arrow-label">Produces actionable output</div>
+    </div>
+    <div class="arch-box output">
+      <h4 style="color:var(--green)">📤 Response Actions</h4>
+      <ul>
+        <li>GitHub Issue (finding)</li>
+        <li>Pull Request (auto-fix)</li>
+        <li>Workflow Summary (dashboard)</li>
+        <li>Notification (Slack / Teams)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Key concept -->
+  <div class="card" style="margin-top:32px;border-left:3px solid var(--blue)">
+    <h4 style="margin-bottom:8px">🔑 Key Concept: Prompt Files as Knowledge Base</h4>
+    <p style="color:var(--text-muted);line-height:1.7">
+      The custom agent uses markdown <strong>"prompt files"</strong> stored in <code>.github/security-agent/</code> that contain
+      security rules and standards, detection patterns (regex, thresholds, indicators), remediation templates, and compliance
+      framework mappings. These files are <strong>version-controlled, reviewable, and updatable</strong> — security-as-code.
+    </p>
+  </div>
+
+  <!-- Prompt file benefits grid -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:20px">
+    <div class="card" style="border-top:2px solid var(--blue);padding:16px">
+      <h4 style="font-size:.9rem;margin-bottom:6px">📝 Version-Controlled</h4>
+      <p style="font-size:.82rem;color:var(--text-muted)">Every rule change is tracked in Git history. Audit who changed what, when, and why via PR reviews.</p>
+    </div>
+    <div class="card" style="border-top:2px solid var(--green);padding:16px">
+      <h4 style="font-size:.9rem;margin-bottom:6px">👀 Reviewable</h4>
+      <p style="font-size:.82rem;color:var(--text-muted)">Security rules go through the same PR review process as code. Require approval from security team leads.</p>
+    </div>
+    <div class="card" style="border-top:2px solid var(--yellow);padding:16px">
+      <h4 style="font-size:.9rem;margin-bottom:6px">⚡ Instantly Updatable</h4>
+      <p style="font-size:.82rem;color:var(--text-muted)">New threat? Update the markdown file. Push. The agent uses the new rules on its next run. No rebuild needed.</p>
+    </div>
+    <div class="card" style="border-top:2px solid var(--purple);padding:16px">
+      <h4 style="font-size:.9rem;margin-bottom:6px">🔄 Composable</h4>
+      <p style="font-size:.82rem;color:var(--text-muted)">Mix and match prompt files per job. DNS job reads DNS rules, VPN job reads VPN rules. Clean separation of concerns.</p>
+    </div>
+  </div>
+
+  <!-- Example prompt file 1: DNS -->
+  <h4 style="margin-top:32px;margin-bottom:8px">Example Prompt Files</h4>
+  <div class="prompt-file">
+    <div class="prompt-file-header"><span class="file-icon">📄</span> .github/security-agent/dns-security-rules.md</div>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <span class="lang-label">Markdown</span>
+<pre># DNS Tunneling Detection Rules
+
+## High-Entropy Subdomain Detection
+- Threshold: Shannon entropy &gt; 3.5 for subdomain labels
+- Pattern: Subdomain length &gt; 30 characters
+- Pattern: Base64-like character distribution (A-Za-z0-9+/=)
+- Alert: CRITICAL when &gt; 10 high-entropy queries
+  to same domain in 5 minutes
+
+## Known-Bad Domain Indicators
+- C2 patterns: Random subdomain + static apex domain
+- DGA patterns: Algorithmically generated domain names
+- Fast-flux: Multiple A records changing rapidly
+
+## Rate Limiting Thresholds
+- Alert: &gt; 50 queries/minute from single source IP
+- Alert: &gt; 20 TXT queries/hour from single source IP
+- Alert: &gt; 100 unique subdomains/hour for same apex domain
+
+## Approved DNS Resolvers
+- 168.63.129.16 (Azure DNS)
+- 10.0.0.4 (Internal DNS)
+- Block: All other outbound DNS (port 53)</pre>
+    </div>
+  </div>
+
+  <!-- Example prompt file 2: IaC -->
+  <div class="prompt-file">
+    <div class="prompt-file-header"><span class="file-icon">📄</span> .github/security-agent/iac-cis-benchmarks.md</div>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <span class="lang-label">Markdown</span>
+<pre># IaC CIS Benchmark Rules (Azure)
+
+## Storage Accounts
+- CRITICAL: Require HTTPS-only transfer (CIS 3.1)
+- CRITICAL: Disable public blob access (CIS 3.7)
+- HIGH: Enable soft delete for blobs (CIS 3.8)
+- HIGH: Enable storage account encryption with CMK
+
+## SQL Databases
+- CRITICAL: Enable Transparent Data Encryption (CIS 4.1.2)
+- CRITICAL: Enable auditing (CIS 4.1.1)
+- HIGH: Set audit retention &gt;= 90 days (CIS 4.1.6)
+- HIGH: Enable Advanced Threat Protection (CIS 4.2.1)
+
+## Key Vault
+- CRITICAL: Enable soft delete (CIS 8.4)
+- CRITICAL: Enable purge protection (CIS 8.5)
+- HIGH: Set secret expiration dates
+- HIGH: Restrict network access with service endpoints</pre>
+    </div>
+  </div>
+
+  <!-- Example prompt file 3: VPN -->
+  <div class="prompt-file">
+    <div class="prompt-file-header"><span class="file-icon">📄</span> .github/security-agent/vpn-crypto-standards.md</div>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <span class="lang-label">Markdown</span>
+<pre># VPN Cryptographic Standards
+
+## Forbidden Algorithms (CRITICAL)
+- DES, 3DES — block cipher too weak
+- MD5 — hash collision attacks proven
+- DH Group 1 (768-bit), DH Group 2 (1024-bit)
+- SHA-1 for integrity
+
+## Required Minimums
+- Encryption: AES-256-GCM or AES-256-CBC
+- Integrity: SHA-256 or SHA-384
+- Key Exchange: DH Group 14 (2048-bit) minimum,
+  DH Group 20 (ECDH 384-bit) preferred
+- IKE version: IKEv2 required (IKEv1 deprecated)
+
+## Certificate Requirements
+- Minimum RSA key size: 2048-bit
+- Preferred: ECDSA P-384
+- Alert: Certificates expiring within 30 days
+- CRITICAL: Certificates using SHA-1 signatures</pre>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ================ SECTION 4: Workflow Implementation ================ -->
+<section id="section-4">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 4</div>
+    <h2>The Agent Workflow Implementation</h2>
+    <p>A complete GitHub Actions workflow that covers ONLY the gaps GHAS doesn't — no duplication.</p>
+  </div>
+
+  <div class="notes">
+    <p>"Notice this workflow explicitly does NOT scan for secrets or code vulnerabilities — GHAS handles those. Each job here maps to a specific domain that GHAS can't see: DNS, firewalls, VPN, compliance, incident response. The prompt files feed each job its detection rules."</p>
+  </div>
+
+  <div class="code-block">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <span class="lang-label">YAML</span>
+<pre>name: "🤖 Custom Security Agent"
+
+# Covers ONLY what GHAS doesn't:
+# ✗ NOT secrets (GHAS Secret Scanning)
+# ✗ NOT code vulns (GHAS CodeQL)
+# ✗ NOT dependency CVEs (GHAS Dependabot)
+# ✓ DNS monitoring, Firewall auditing, Network forensics
+# ✓ IaC deep CIS checks, WAF/ZeroTrust validation
+# ✓ VPN crypto audit, Policy enforcement
+# ✓ Network compliance, Incident reporting
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'      # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Scan scope'
+        type: choice
+        options:
+          - all
+          - network
+          - infrastructure
+          - compliance
+        default: 'all'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+env:
+  RULES_DIR: .github/security-agent
+  SEVERITY_THRESHOLD: HIGH
+
+jobs:
+  # ─── Job 1: DNS Threat Monitor ───────────────
+  dns-monitoring:
+    name: "🌐 DNS Threat Monitor"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'network'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load DNS security rules
+        id: rules
+        run: |
+          echo "Loading prompt file..."
+          cat ${{ env.RULES_DIR }}/dns-security-rules.md
+          echo "rules_loaded=true" >> $GITHUB_OUTPUT
+
+      - name: Analyze DNS logs for exfiltration
+        run: |
+          python scenarios/01-dns-alert/remediate.py \
+            --rules ${{ env.RULES_DIR }}/dns-security-rules.md \
+            --output dns-findings.json
+
+      - name: Post findings to summary
+        if: always()
+        run: |
+          echo "## 🌐 DNS Threat Monitor" >> $GITHUB_STEP_SUMMARY
+          python scripts/format-findings.py dns-findings.json \
+            >> $GITHUB_STEP_SUMMARY
+
+  # ─── Job 2: KQL Query Generator ─────────────
+  kql-siem:
+    name: "🔍 KQL/SIEM Query Generator"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'network'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate detection queries
+        run: |
+          python scenarios/02-kql-siem/generate_queries.py \
+            --rules ${{ env.RULES_DIR }}/siem-detection-rules.md
+
+  # ─── Job 3: Firewall Audit ──────────────────
+  firewall-audit:
+    name: "🔥 Firewall Rule Audit"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'network'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate firewall rules
+        run: |
+          python scenarios/03-firewall/audit.py \
+            --rules ${{ env.RULES_DIR }}/firewall-best-practices.md \
+            --config configs/firewall-rules.json
+
+  # ─── Job 4: Network Forensics ───────────────
+  network-forensics:
+    name: "🔬 Network Forensics"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'network'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract IOCs and build timeline
+        run: |
+          python scenarios/04-forensics/analyze.py \
+            --rules ${{ env.RULES_DIR }}/network-forensics.md
+
+  # ─── Job 5: (SKIP — GHAS Secret Scanning) ───
+  # Secret scanning handled by GHAS natively.
+  # Enable in: Settings → Code security → Secret scanning
+
+  # ─── Job 6: IaC CIS Benchmark Scan ─────────
+  iac-hardening:
+    name: "🏗️ IaC CIS Benchmark Scan"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'infrastructure'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deep CIS scan for Bicep/Terraform
+        run: |
+          python scenarios/06-iac-harden/scan.py \
+            --rules ${{ env.RULES_DIR }}/iac-cis-benchmarks.md \
+            --glob "**/*.{bicep,tf,json}"
+
+  # ─── Job 7: WAF & Zero Trust Validation ─────
+  waf-zerotrust:
+    name: "🛡️ WAF & Zero Trust"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'infrastructure'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate WAF and segmentation
+        run: |
+          python scenarios/07-waf-zerotrust/validate.py \
+            --rules ${{ env.RULES_DIR }}/waf-zerotrust-rules.md
+
+  # ─── Job 8: VPN Crypto Audit ────────────────
+  vpn-audit:
+    name: "🔒 VPN Crypto Audit"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'infrastructure'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit VPN configurations
+        run: |
+          python scenarios/08-vpn-audit/audit.py \
+            --rules ${{ env.RULES_DIR }}/vpn-crypto-standards.md
+
+  # ─── Job 9: Policy-as-Code Enforcement ──────
+  policy-enforcement:
+    name: "📜 Policy-as-Code"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'compliance'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Evaluate OPA/Rego policies
+        run: |
+          python scenarios/09-policy-code/evaluate.py \
+            --rules ${{ env.RULES_DIR }}/policy-definitions.md
+
+  # ─── Job 10: Network Compliance ─────────────
+  network-compliance:
+    name: "📋 Network Compliance Monitor"
+    runs-on: ubuntu-latest
+    if: >-
+      inputs.scope == 'all' ||
+      inputs.scope == 'compliance'
+    steps:
+      - uses: actions/checkout@v4
+      - name: CIS/NIST/PCI benchmark check
+        run: |
+          python scenarios/10-compliance/monitor.py \
+            --rules ${{ env.RULES_DIR }}/compliance-frameworks.md
+
+  # ─── Job 11: (SKIP — GHAS CodeQL) ──────────
+  # Vulnerability detection handled by GHAS CodeQL.
+  # Enable in: Settings → Code security → Code scanning
+
+  # ─── Job 12: Incident Report Generator ──────
+  incident-report:
+    name: "📊 Incident Report"
+    needs:
+      - dns-monitoring
+      - firewall-audit
+      - network-forensics
+      - iac-hardening
+      - vpn-audit
+      - network-compliance
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Correlate findings & generate report
+        run: |
+          python scenarios/12-incident-report/generate.py \
+            --rules ${{ env.RULES_DIR }}/incident-report-template.md \
+            --mitre-mapping ${{ env.RULES_DIR }}/mitre-attack-map.md
+
+      - name: Create issue for critical findings
+        if: env.HAS_CRITICAL == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('incident-report.md','utf8');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Security Agent: Critical Findings',
+              body: report,
+              labels: ['security','critical','automated']
+            });</pre>
+  </div>
+
+  <div class="card" style="margin-top:24px;border-left:3px solid var(--purple)">
+    <h4 style="margin-bottom:8px">📌 Notice: Jobs 5 and 11 are intentionally skipped</h4>
+    <p style="color:var(--text-muted)">
+      Secret scanning (Job 5) and code vulnerability detection (Job 11) are omitted because <strong>GHAS handles them natively</strong>.
+      The custom agent workflow covers <em>only</em> the 8 domains GHAS doesn't reach: DNS, KQL/SIEM, firewalls, forensics,
+      IaC deep scanning, WAF/Zero Trust, VPN, and compliance.
+    </p>
+  </div>
+</div>
+</section>
+
+<!-- ================ SECTION 5: GHAS Setup ================ -->
+<section id="section-5">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 5</div>
+    <h2>GHAS Setup Guide — For the Built-in Coverage</h2>
+    <p>Enable these features first. Each takes minutes and gives you world-class code security immediately.</p>
+  </div>
+
+  <div class="notes">
+    <p>"Step one with any customer is: enable GHAS. It takes 5 minutes and you immediately get world-class code and supply chain security. THEN we layer the custom agent on top for everything else."</p>
+  </div>
+
+  <div class="setup-grid">
+
+    <div class="setup-card" style="border-top:3px solid var(--green)">
+      <h4><span class="icon">🔑</span> Secret Scanning</h4>
+      <ul>
+        <li>Settings → Code security → Secret scanning → <strong>Enable</strong></li>
+        <li>Push Protection → <strong>Enable</strong> (blocks pushes containing secrets)</li>
+        <li>Custom patterns: Add org-specific secret patterns</li>
+        <li>Detects 200+ secret types from 100+ providers</li>
+        <li>Non-provider patterns: generic passwords, private keys</li>
+      </ul>
+    </div>
+
+    <div class="setup-card" style="border-top:3px solid var(--green)">
+      <h4><span class="icon">🔍</span> Code Scanning (CodeQL)</h4>
+      <ul>
+        <li>Enable via <strong>default setup</strong> or advanced setup</li>
+        <li>Languages: JS, Python, Java, C#, Go, Ruby, Swift, C/C++</li>
+        <li>Covers: SQLi, XSS, command injection, path traversal, SSRF</li>
+        <li>Copilot Autofix: AI suggests fixes in PRs</li>
+        <li>Custom queries for org-specific patterns</li>
+      </ul>
+    </div>
+
+    <div class="setup-card" style="border-top:3px solid var(--green)">
+      <h4><span class="icon">📦</span> Dependabot</h4>
+      <ul>
+        <li>Enable <strong>Dependabot alerts</strong> for known CVEs</li>
+        <li>Enable <strong>Dependabot security updates</strong> (auto-PRs for CVEs)</li>
+        <li>Enable <strong>Dependabot version updates</strong> (keep deps current)</li>
+        <li>Configure update schedule in <code>dependabot.yml</code></li>
+      </ul>
+    </div>
+
+    <div class="setup-card" style="border-top:3px solid var(--green)">
+      <h4><span class="icon">🔗</span> Supply Chain</h4>
+      <ul>
+        <li>Dependency graph → <strong>Enable</strong></li>
+        <li>SBOM export for compliance audits</li>
+        <li>Dependency review for PRs (block risky deps)</li>
+        <li>Advisory database: community + GitHub curated</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="code-block" style="margin-top:24px">
+    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    <span class="lang-label">YAML</span>
+<pre># .github/workflows/codeql.yml  (Default CodeQL Setup)
+name: "CodeQL"
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1'    # Weekly Monday 6am
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    strategy:
+      matrix:
+        language: [ 'javascript', 'python' ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3</pre>
+  </div>
+</div>
+</section>
+
+<!-- ================ SECTION 6: Defense in Depth ================ -->
+<section id="section-6">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 6</div>
+    <h2>The Complete Picture — Defense in Depth</h2>
+    <p>Four layers of security. GHAS is the foundation, the custom agent wraps around it.</p>
+  </div>
+
+  <div class="notes">
+    <p>"This is the slide customers love. GHAS is the foundation — rock-solid code security. The custom agent wraps around it to cover network, infrastructure, compliance, and incident response. Together, four layers of defense. No gaps."</p>
+  </div>
+
+  <!-- Nested defense layers -->
+  <div class="defense-layers">
+    <div class="layer layer-4">
+      <div class="layer-tag" style="color:var(--purple)">Layer 4 — Custom Agent</div>
+      <h4>Incident Response</h4>
+      <p>Auto-reports, MITRE ATT&CK mapping, executive summaries, board-ready findings</p>
+      <div style="margin-top:16px">
+        <div class="layer layer-3">
+          <div class="layer-tag" style="color:var(--yellow)">Layer 3 — Custom Agent</div>
+          <h4>Compliance &amp; Governance</h4>
+          <p>CIS / NIST 800-53 / PCI-DSS continuous monitoring, policy-as-code enforcement</p>
+          <div style="margin-top:16px">
+            <div class="layer layer-2">
+              <div class="layer-tag" style="color:var(--blue)">Layer 2 — Custom Agent</div>
+              <h4>Network &amp; Infrastructure</h4>
+              <p>DNS monitoring, firewall auditing, VPN crypto checks, WAF validation, Zero Trust, forensics</p>
+              <div style="margin-top:16px">
+                <div class="layer layer-1">
+                  <div class="layer-tag" style="color:var(--green)">Layer 1 — GHAS</div>
+                  <h4>Code &amp; Supply Chain</h4>
+                  <p>CodeQL, Secret Scanning, Push Protection, Dependabot, Dependency Graph, SBOM</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-row" style="margin-top:32px">
+    <div class="stat-box" style="border-top:3px solid var(--green)">
+      <div class="stat-num" style="color:var(--green)">Layer 1</div>
+      <div class="stat-label">GHAS — Code &amp; Supply Chain</div>
+    </div>
+    <div class="stat-box" style="border-top:3px solid var(--blue)">
+      <div class="stat-num" style="color:var(--blue)">Layer 2</div>
+      <div class="stat-label">Agent — Network &amp; Infra</div>
+    </div>
+    <div class="stat-box" style="border-top:3px solid var(--yellow)">
+      <div class="stat-num" style="color:var(--yellow)">Layer 3</div>
+      <div class="stat-label">Agent — Compliance</div>
+    </div>
+    <div class="stat-box" style="border-top:3px solid var(--purple)">
+      <div class="stat-num" style="color:var(--purple)">Layer 4</div>
+      <div class="stat-label">Agent — Incident Response</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ================ SECTION 7: Customer ROI ================ -->
+<section id="section-7">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 7</div>
+    <h2>Customer ROI</h2>
+    <p>The business case for GHAS + Custom Agent — real numbers, real impact.</p>
+  </div>
+
+  <div class="notes">
+    <p>"The IBM Cost of a Data Breach report says average breach costs $4.45M. Average time to detect is 197 days. With GHAS catching code issues at commit time and the custom agent monitoring infrastructure every 15 minutes — you're detecting in minutes, not months."</p>
+  </div>
+
+  <div style="overflow-x:auto">
+  <table class="roi-table">
+    <thead>
+      <tr><th>Metric</th><th>Without</th><th>With GHAS + Agent</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="metric">Secret exposure incidents / year</td>
+        <td class="without">3–5 incidents</td>
+        <td class="with">0 (push protection blocks them)</td>
+        <td class="savings">~$200K per incident avoided</td>
+      </tr>
+      <tr>
+        <td class="metric">Mean time to detect (MTTD)</td>
+        <td class="without">197 days (IBM report)</td>
+        <td class="with">&lt; 15 minutes</td>
+        <td class="savings">Massive risk reduction</td>
+      </tr>
+      <tr>
+        <td class="metric">Compliance audit prep time</td>
+        <td class="without">2–4 weeks manual</td>
+        <td class="with">Automated continuous report</td>
+        <td class="savings">80% time savings</td>
+      </tr>
+      <tr>
+        <td class="metric">SOC analyst routine work</td>
+        <td class="without">60% on routine checks</td>
+        <td class="with">Automated by agent</td>
+        <td class="savings">Analysts focus on advanced threats</td>
+      </tr>
+      <tr>
+        <td class="metric">Vulnerability remediation time</td>
+        <td class="without">60 days average</td>
+        <td class="with">Same-day (auto-PR)</td>
+        <td class="savings">98% faster</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="card" style="margin-top:24px;text-align:center;border-left:3px solid var(--yellow)">
+    <p style="font-size:1.1rem">
+      <strong style="color:var(--yellow)">Average cost of a data breach:</strong>
+      <span style="font-size:1.5rem;font-weight:800;color:var(--red)"> $4.45M</span>
+      <span style="color:var(--text-muted);display:block;font-size:.85rem;margin-top:4px">Source: IBM Cost of a Data Breach Report 2023</span>
+    </p>
+  </div>
+</div>
+</section>
+
+<!-- ================ SECTION 8: Demo Sequence ================ -->
+<section id="section-8">
+<div class="container">
+  <div class="section-header">
+    <div class="section-num">Section 8</div>
+    <h2>Demo Sequence for Customers</h2>
+    <p>A step-by-step flow for presenting GHAS + Custom Agent to enterprise customers.</p>
+  </div>
+
+  <div class="notes">
+    <p>"This is your playbook for the customer demo. Part A shows GHAS doing its thing — 5 minutes, all built-in. Part B shows the custom agent covering everything else — 10 minutes. Part C ties it all together with the layered defense picture and ROI. Close strong."</p>
+  </div>
+
+  <div class="demo-flow">
+
+    <!-- Part A -->
+    <div class="demo-part" style="border-top:3px solid var(--green)">
+      <div class="demo-part-header">
+        <span class="part-badge badge badge-green">Part A</span>
+        <h4>GHAS Demo (5 min)</h4>
+      </div>
+      <div class="demo-part-body">
+        <ol>
+          <li>Show repo <strong>Security tab → Security Overview</strong>
+            <div class="notes"><p>"Start here. This is the single pane of glass for all GHAS findings. The customer sees code scanning, secret scanning, and Dependabot alerts all in one place."</p></div>
+          </li>
+          <li>Show <strong>Code Scanning alerts</strong> (CodeQL findings)
+            <div class="notes"><p>"Click into a CodeQL alert. Show the data flow visualization — how the tainted input flows from source to sink. This is what makes CodeQL special compared to regex-based scanners."</p></div>
+          </li>
+          <li>Show <strong>Secret Scanning alerts</strong>
+            <div class="notes"><p>"Show a detected secret. Point out that GitHub automatically notified the provider (e.g., AWS) to revoke the key. This is partner program integration — automatic remediation."</p></div>
+          </li>
+          <li>Demo <strong>Push Protection:</strong> try to push a secret → <span class="badge badge-red" style="font-size:.75rem">BLOCKED</span>
+            <div class="notes"><p>"This is the money moment. Actually try to push a file containing a fake AWS key. Show the customer the push gets rejected with a clear message explaining why. Prevention beats detection."</p></div>
+          </li>
+          <li>Show <strong>Dependabot PRs</strong> for vulnerable dependencies
+            <div class="notes"><p>"Show an actual Dependabot PR. It updates the dependency, shows the changelog, and the CI runs automatically. One click to merge and you've patched a CVE."</p></div>
+          </li>
+          <li>Show <strong>Copilot Autofix</strong> suggesting code fixes in a PR
+            <div class="notes"><p>"This is AI-powered remediation. CodeQL finds the bug, Copilot Autofix suggests the fix, developer reviews and merges. The entire vulnerability lifecycle in one platform."</p></div>
+          </li>
+        </ol>
+        <div class="quote">"All of this is built into GitHub — zero custom code needed."</div>
+      </div>
+    </div>
+
+    <!-- Part B -->
+    <div class="demo-part" style="border-top:3px solid var(--purple)">
+      <div class="demo-part-header">
+        <span class="part-badge badge badge-purple">Part B</span>
+        <h4>Custom Agent Demo (10 min)</h4>
+      </div>
+      <div class="demo-part-body">
+        <ol>
+          <li><strong>"Now let's look at what GHAS can't see..."</strong>
+            <div class="notes"><p>"Transition moment. Acknowledge GHAS is amazing — and then pivot. 'But your security team also worries about network threats, infrastructure drift, VPN security, and compliance. Let me show you how we cover those.'"</p></div>
+          </li>
+          <li>Show the prompt files in <code>.github/security-agent/</code>
+            <div class="notes"><p>"Open a prompt file. Show how it's written in plain English with specific thresholds. Point out it's a regular markdown file in Git — the security team can update it via PR just like code."</p></div>
+          </li>
+          <li>Trigger the <strong>Custom Security Agent workflow</strong>
+            <div class="notes"><p>"Go to Actions tab, find the Custom Security Agent workflow, click 'Run workflow'. While it runs, explain the architecture — how each job reads its own prompt file."</p></div>
+          </li>
+          <li>Show DNS monitoring <strong>finding C2 traffic</strong>
+            <div class="notes"><p>"Show the DNS job output. Point out the entropy calculation, the flagged domains, the alert severity. This is network-layer visibility that no code scanner can provide."</p></div>
+          </li>
+          <li>Show IaC scanning finding <strong>CIS benchmark failures</strong>
+            <div class="notes"><p>"Show the IaC job finding a storage account without encryption or a SQL server with public access. These are deep infrastructure checks that go beyond what CodeQL's IaC queries cover."</p></div>
+          </li>
+          <li>Show VPN audit finding <strong>weak crypto</strong>
+            <div class="notes"><p>"Show the VPN job flagging DES encryption or an expired certificate. Ask the customer: 'Would your team catch this in their current process?'"</p></div>
+          </li>
+          <li>Show compliance report with <strong>CIS / NIST / PCI scores</strong>
+            <div class="notes"><p>"Show the compliance dashboard with percentage scores per framework. Point out specific controls that are passing vs. failing. This is audit-ready output."</p></div>
+          </li>
+          <li>Show auto-generated <strong>issue and PR</strong> from the agent
+            <div class="notes"><p>"Show the GitHub Issue the agent created with severity, description, remediation steps, and the auto-generated PR with the fix. The agent doesn't just find problems — it fixes them."</p></div>
+          </li>
+        </ol>
+        <div class="quote">"This is the custom agent filling every gap GHAS doesn't cover."</div>
+      </div>
+    </div>
+
+    <!-- Part C -->
+    <div class="demo-part" style="border-top:3px solid var(--accent)">
+      <div class="demo-part-header">
+        <span class="part-badge badge badge-blue">Part C</span>
+        <h4>The Big Picture (2 min)</h4>
+      </div>
+      <div class="demo-part-body">
+        <ol>
+          <li>Show the <strong>layered defense diagram</strong> (Section 6)
+            <div class="notes"><p>"Pull up the defense-in-depth visual. Walk through each layer from inside out. GHAS is the core — rock solid. Then network, compliance, and incident response layers wrap around it."</p></div>
+          </li>
+          <li><strong>"Layer 1 = GHAS. Layers 2–4 = Custom Agent. Complete coverage."</strong>
+            <div class="notes"><p>"Emphasize: no gaps. Every domain is covered by either GHAS or the custom agent. There's no security blind spot left."</p></div>
+          </li>
+          <li>Show <strong>ROI numbers</strong> (Section 7)
+            <div class="notes"><p>"Hit them with the $4.45M average breach cost and the 197-day detection time. Then show your solution: 15-minute detection, automated remediation, continuous compliance. Ask: 'What's your current MTTD?'"</p></div>
+          </li>
+        </ol>
+        <div class="quote">"When can we get this running in your environment?"</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Common objections -->
+  <h3 style="margin-top:40px;font-size:1.3rem">Common Customer Objections &amp; Responses</h3>
+  <div style="display:grid;gap:12px;margin-top:16px">
+    <div class="card" style="padding:16px;border-left:3px solid var(--yellow)">
+      <p style="font-weight:700;margin-bottom:4px">❓ "We already have a SIEM — why do we need this?"</p>
+      <p style="color:var(--text-muted);font-size:.9rem">"Great — the agent feeds your SIEM. It auto-generates KQL queries and correlates events so your SOC analysts don't have to write detection rules from scratch. It makes your SIEM investment more effective."</p>
+    </div>
+    <div class="card" style="padding:16px;border-left:3px solid var(--yellow)">
+      <p style="font-weight:700;margin-bottom:4px">❓ "Can't we just use Defender for Cloud?"</p>
+      <p style="color:var(--text-muted);font-size:.9rem">"Defender for Cloud is great for Azure posture. The custom agent complements it by covering on-prem infrastructure, multi-cloud configs, and custom compliance frameworks specific to your org. Plus it integrates directly into the developer workflow via GitHub."</p>
+    </div>
+    <div class="card" style="padding:16px;border-left:3px solid var(--yellow)">
+      <p style="font-weight:700;margin-bottom:4px">❓ "How do we maintain the prompt files?"</p>
+      <p style="color:var(--text-muted);font-size:.9rem">"Same way you maintain runbooks — but better. They're in Git, so every change is reviewed, approved, and auditable. Your security team updates them when new threats emerge or compliance requirements change. No specialized tooling needed — just markdown."</p>
+    </div>
+    <div class="card" style="padding:16px;border-left:3px solid var(--yellow)">
+      <p style="font-weight:700;margin-bottom:4px">❓ "What about false positives?"</p>
+      <p style="color:var(--text-muted);font-size:.9rem">"The detection thresholds are defined in the prompt files and tunable. Start conservative, then tighten based on your environment. Each finding includes confidence scores and context so analysts can triage quickly."</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ======================= FOOTER ======================= -->
+<footer>
+  <div class="container">
+    <div class="tagline">GHAS handles code. The agent handles everything else. Together: complete coverage.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:700px;margin:24px auto;text-align:center">
+      <div style="padding:12px;border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:1.4rem;font-weight:800;color:var(--green)">GHAS</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">Code &amp; Supply Chain</div>
+      </div>
+      <div style="padding:12px;border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:1.4rem;font-weight:800;color:var(--purple)">Agent</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">Network, Infra &amp; Compliance</div>
+      </div>
+      <div style="padding:12px;border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:1.4rem;font-weight:800;color:var(--accent)">100%</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">Complete Coverage</div>
+      </div>
+    </div>
+
+    <div class="links">
+      <a href="https://github.com/features/security" target="_blank">GHAS Documentation</a>
+      <a href="https://docs.github.com/en/code-security" target="_blank">Code Security Docs</a>
+      <a href="https://docs.github.com/en/code-security/secret-scanning" target="_blank">Secret Scanning</a>
+      <a href="https://docs.github.com/en/code-security/code-scanning" target="_blank">Code Scanning</a>
+      <a href="index.html">Demo Dashboard</a>
+    </div>
+    <div class="hint">Press <strong>N</strong> for presenter notes · Keys <strong>1–8</strong> jump to sections · All content self-contained — works offline</div>
+  </div>
+</footer>
+
+<script>
+// ─── Notes Toggle ────────────────────────────
+function toggleNotes() {
+  document.body.classList.toggle('show-notes');
+  const btn = document.querySelector('.notes-toggle');
+  if (document.body.classList.contains('show-notes')) {
+    btn.innerHTML = '🎤 Hide Notes <span class="kbd">N</span>';
+  } else {
+    btn.innerHTML = '🎤 Notes <span class="kbd">N</span>';
+  }
+}
+
+// ─── Collapsible Sections ────────────────────
+function toggleCollapse(el) {
+  el.classList.toggle('collapsed');
+  const content = el.nextElementSibling;
+  if (content) content.classList.toggle('collapsed');
+}
+
+// ─── Copy Code ───────────────────────────────
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  const text = pre.textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(function() {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); btn.textContent = 'Copied!'; btn.classList.add('copied'); }
+    catch(e) { btn.textContent = 'Failed'; }
+    document.body.removeChild(ta);
+    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ─── Keyboard Shortcuts ──────────────────────
+document.addEventListener('keydown', function(e) {
+  // Ignore if typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  // N = toggle notes
+  if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault();
+    toggleNotes();
+    return;
+  }
+
+  // 1-8 = jump to section
+  var num = parseInt(e.key);
+  if (num >= 1 && num <= 8) {
+    e.preventDefault();
+    var section = document.getElementById('section-' + num);
+    if (section) section.scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+});
+
+// ─── Active nav highlight ────────────────────
+var tocLinks = document.querySelectorAll('nav.toc a');
+var sections = [];
+for (var i = 1; i <= 8; i++) {
+  var s = document.getElementById('section-' + i);
+  if (s) sections.push(s);
+}
+
+function updateActiveNav() {
+  var scrollPos = window.scrollY + 120;
+  var current = '';
+  sections.forEach(function(sec) {
+    if (sec.offsetTop <= scrollPos) {
+      current = sec.id;
+    }
+  });
+  tocLinks.forEach(function(link) {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === '#' + current) {
+      link.classList.add('active');
+    }
+  });
+}
+
+var scrollTimer;
+window.addEventListener('scroll', function() {
+  if (scrollTimer) cancelAnimationFrame(scrollTimer);
+  scrollTimer = requestAnimationFrame(updateActiveNav);
+});
+updateActiveNav();
+</script>
+</body>
+</html>
