@@ -1,0 +1,337 @@
+name: "🔄 Full Security Pipeline"
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Security check to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - dns
+          - firewall
+          - iac
+          - vuln
+          - compliance
+
+jobs:
+  full-pipeline:
+    name: "🔄 Full Security Pipeline (${{ inputs.scenario }})"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "🌐 DNS Threat Detection"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'dns' }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, math, json
+          from collections import Counter
+
+          print("=" * 50)
+          print("  🌐 DNS Threat Detection")
+          print("=" * 50)
+
+          def entropy(s):
+              if not s:
+                  return 0
+              freq = Counter(s)
+              length = len(s)
+              return -sum((c / length) * math.log2(c / length) for c in freq.values())
+
+          findings = []
+          log_file = "vulnerable-app/dns_queries.log"
+          if os.path.exists(log_file):
+              with open(log_file) as f:
+                  lines = f.readlines()
+              print(f"  📄 Analyzed {len(lines)} DNS log entries")
+              domain_counts = Counter()
+              for line in lines:
+                  parts = line.strip().split()
+                  domain = parts[-1] if parts else line.strip()
+                  domain_counts[domain] += 1
+                  sub = domain.split('.')[0]
+                  if entropy(sub) > 3.5 and len(sub) > 10:
+                      findings.append({"domain": domain, "entropy": round(entropy(sub), 2), "severity": "HIGH"})
+              for domain, count in domain_counts.most_common(5):
+                  if count > 5:
+                      findings.append({"domain": domain, "count": count, "severity": "MEDIUM", "type": "high_frequency"})
+          else:
+              print("  ⚠️  No DNS log file found")
+              findings.append({"domain": "N/A", "severity": "INFO", "note": "No DNS logs available"})
+
+          with open("pipeline-dns.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"  ✅ DNS scan: {len(findings)} findings")
+          PYEOF
+
+      - name: "🛡️ Firewall Rule Validation"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'firewall' }}
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+
+          print("=" * 50)
+          print("  🛡️ Firewall Rule Validation")
+          print("=" * 50)
+
+          findings = []
+          fw_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if 'firewall' in f.lower() and f.endswith('.json'):
+                      fw_files.append(os.path.join(root, f))
+
+          if fw_files:
+              for fw in fw_files:
+                  with open(fw) as f:
+                      data = json.load(f)
+                  rules = data.get("rules", data if isinstance(data, list) else [])
+                  print(f"  📄 Checking {len(rules)} rules from {fw}")
+                  for rule in rules:
+                      src = rule.get("source", "")
+                      port = str(rule.get("port", ""))
+                      action = rule.get("action", "")
+                      name = rule.get("name", "unnamed")
+                      if action == "allow" and src in ("0.0.0.0/0", "*", "any"):
+                          sev = "CRITICAL" if port in ("*", "any") else "HIGH"
+                          findings.append({"rule": name, "severity": sev, "issue": f"Open source on port {port}"})
+                          print(f"  🚨 [{sev}] {name}: {src} → port {port}")
+          else:
+              print("  ⚠️  No firewall rules found")
+              findings.append({"rule": "N/A", "severity": "INFO", "issue": "No firewall rules to check"})
+
+          with open("pipeline-firewall.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"  ✅ Firewall check: {len(findings)} findings")
+          PYEOF
+
+      - name: "🏗️ IaC Security Check"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'iac' }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json
+
+          print("=" * 50)
+          print("  🏗️ Infrastructure Security Check")
+          print("=" * 50)
+
+          findings = []
+          iac_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if f.endswith(('.bicep', '.tf')):
+                      iac_files.append(os.path.join(root, f))
+
+          PATTERNS = [
+              ("Public access", r"publicAccess|public_access_enabled\s*=\s*true", "HIGH"),
+              ("Hardcoded secret", r"(?:password|secret|key)\s*[=:]\s*['\"][^'\"]{8,}", "CRITICAL"),
+              ("HTTP allowed", r"httpsOnly\s*:\s*false|enable_https_traffic_only\s*=\s*false", "MEDIUM"),
+              ("Unrestricted CIDR", r"0\.0\.0\.0/0|source_address_prefix\s*=\s*\"\*\"", "CRITICAL"),
+          ]
+
+          if iac_files:
+              for iac in iac_files:
+                  print(f"  📄 Scanning: {iac}")
+                  with open(iac) as f:
+                      content = f.read()
+                  for name, pattern, severity in PATTERNS:
+                      matches = re.findall(pattern, content, re.IGNORECASE)
+                      if matches:
+                          findings.append({"file": iac, "issue": name, "severity": severity, "matches": len(matches)})
+                          print(f"  🚨 [{severity}] {name} in {iac}")
+          else:
+              print("  ⚠️  No IaC files found")
+              findings.append({"file": "N/A", "severity": "INFO", "issue": "No IaC templates found"})
+
+          with open("pipeline-iac.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"  ✅ IaC check: {len(findings)} findings")
+          PYEOF
+
+      - name: "🐛 Vulnerability Scan"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'vuln' }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json
+
+          print("=" * 50)
+          print("  🐛 Vulnerability Scan")
+          print("=" * 50)
+
+          findings = []
+          VULN_PATTERNS = [
+              ("SQL Injection", [r'execute\s*\(\s*f["\']', r'cursor\.execute\s*\(\s*["\'].*\+'], "CRITICAL"),
+              ("Command Injection", [r'os\.system\s*\(', r'os\.popen\s*\(', r'eval\s*\('], "CRITICAL"),
+              ("XSS", [r'render_template_string\s*\(', r'Markup\s*\('], "HIGH"),
+              ("Path Traversal", [r'open\s*\(\s*.*request', r'\.\./', r'send_file\s*\(\s*.*request'], "HIGH"),
+              ("Insecure Deserialization", [r'pickle\.loads?\s*\(', r'yaml\.load\s*\(\s*[^,)]*\)'], "CRITICAL"),
+              ("Debug Mode", [r'debug\s*=\s*True', r'app\.run\s*\(.*debug'], "MEDIUM"),
+          ]
+
+          py_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root or '.github' in root:
+                  continue
+              for f in files:
+                  if f.endswith('.py'):
+                      py_files.append(os.path.join(root, f))
+
+          if py_files:
+              for pyf in py_files:
+                  with open(pyf) as f:
+                      lines = f.readlines()
+                  for name, patterns, severity in VULN_PATTERNS:
+                      for pat in patterns:
+                          for i, line in enumerate(lines, 1):
+                              if re.search(pat, line):
+                                  findings.append({"file": pyf, "line": i, "vuln": name, "severity": severity})
+                                  print(f"  🚨 [{severity}] {name} in {pyf}:{i}")
+          else:
+              print("  ⚠️  No Python files found")
+              findings.append({"file": "N/A", "severity": "INFO", "vuln": "No code to scan"})
+
+          with open("pipeline-vuln.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"  ✅ Vuln scan: {len(findings)} findings")
+          PYEOF
+
+      - name: "📋 Compliance Check"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'compliance' }}
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+
+          print("=" * 50)
+          print("  📋 Compliance Check")
+          print("=" * 50)
+
+          REQUIRED_AREAS = ["encryption", "network", "logging", "secrets", "identity", "backup"]
+          findings = []
+          all_content = ""
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if f.endswith(('.json', '.yaml', '.yml', '.md', '.txt', '.py', '.bicep', '.tf')):
+                      try:
+                          with open(os.path.join(root, f)) as fh:
+                              all_content += fh.read().lower() + "\n"
+                      except (UnicodeDecodeError, PermissionError):
+                          pass
+
+          for area in REQUIRED_AREAS:
+              covered = area in all_content
+              status = "PASS" if covered else "FAIL"
+              emoji = "✅" if covered else "❌"
+              print(f"  {emoji} {area}: {status}")
+              findings.append({"area": area, "status": status})
+
+          with open("pipeline-compliance.json", "w") as f:
+              json.dump(findings, f, indent=2)
+
+          passed = sum(1 for f_item in findings if f_item["status"] == "PASS")
+          print(f"  ✅ Compliance: {passed}/{len(findings)} areas covered")
+          PYEOF
+
+      - name: "📊 Generate Consolidated Report"
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime, os
+
+          report = []
+          report.append("# 🔄 Full Security Pipeline Report")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Scenario:** ${{ inputs.scenario }}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append("")
+          report.append("---")
+          report.append("")
+
+          total_findings = 0
+          total_critical = 0
+
+          sections = [
+              ("pipeline-dns.json", "🌐 DNS Threat Detection"),
+              ("pipeline-firewall.json", "🛡️ Firewall Validation"),
+              ("pipeline-iac.json", "🏗️ IaC Security"),
+              ("pipeline-vuln.json", "🐛 Vulnerability Scan"),
+              ("pipeline-compliance.json", "📋 Compliance"),
+          ]
+
+          report.append("## 📊 Summary Dashboard")
+          report.append("")
+          report.append("| Check | Findings | Critical | Status |")
+          report.append("|-------|----------|----------|--------|")
+
+          for filename, label in sections:
+              if os.path.exists(filename):
+                  with open(filename) as f:
+                      data = json.load(f)
+                  count = len(data)
+                  critical = sum(1 for d in data if d.get("severity") == "CRITICAL")
+                  total_findings += count
+                  total_critical += critical
+                  status = "❌ FAIL" if critical > 0 else ("⚠️ WARN" if count > 0 else "✅ PASS")
+                  report.append(f"| {label} | {count} | {critical} | {status} |")
+              else:
+                  report.append(f"| {label} | — | — | ⏭️ SKIPPED |")
+
+          report.append("")
+          report.append(f"**Total findings: {total_findings} | Critical: {total_critical}**")
+          report.append("")
+
+          # Detailed results per section
+          for filename, label in sections:
+              if os.path.exists(filename):
+                  report.append(f"## {label}")
+                  with open(filename) as f:
+                      data = json.load(f)
+                  if data:
+                      for item in data[:15]:
+                          severity = item.get("severity", "INFO")
+                          emoji = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🔵", "INFO": "ℹ️"}.get(severity, "⚪")
+                          desc = item.get("issue", item.get("vuln", item.get("domain", item.get("area", "—"))))
+                          file_ref = item.get("file", item.get("rule", ""))
+                          report.append(f"- {emoji} **{severity}**: {desc} {('(`' + file_ref + '`)') if file_ref and file_ref != 'N/A' else ''}")
+                  else:
+                      report.append("✅ No issues found.")
+                  report.append("")
+
+          report.append("---")
+          report.append("*Report generated by Full Security Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("full-pipeline-report.md", "w") as f:
+              f.write(full_report)
+          print("📊 Consolidated report generated: full-pipeline-report.md")
+          PYEOF
+
+      - name: "📝 Post Summary"
+        run: |
+          cat full-pipeline-report.md >> "$GITHUB_STEP_SUMMARY"
+          echo ""
+          echo "✅ Summary posted to GitHub Actions step summary"
+
+      - name: "📤 Upload Pipeline Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-pipeline-report
+          path: |
+            full-pipeline-report.md
+            pipeline-*.json
+          retention-days: 30

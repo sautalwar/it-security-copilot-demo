@@ -1,0 +1,229 @@
+name: "🏗️ Infrastructure Security Check"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "infra/**"
+
+jobs:
+  iac-security-check:
+    name: "🏗️ IaC Security Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "🔍 Scan Bicep Templates"
+        run: |
+          python3 << 'PYEOF'
+          import os, re
+
+          print("=" * 50)
+          print("  🔍 Bicep Template Security Scan")
+          print("=" * 50)
+          print()
+
+          BICEP_CHECKS = [
+              {"id": "BICEP-001", "name": "Public access enabled", "severity": "HIGH",
+               "pattern": r"publicAccess\s*:\s*['\"]?(?:Enabled|true|Blob|Container)", "desc": "Storage/resource has public access enabled"},
+              {"id": "BICEP-002", "name": "Missing encryption", "severity": "HIGH",
+               "pattern": r"encryption\s*:\s*\{[^}]*enabled\s*:\s*false", "desc": "Encryption explicitly disabled"},
+              {"id": "BICEP-003", "name": "HTTP allowed", "severity": "MEDIUM",
+               "pattern": r"httpsOnly\s*:\s*false|supportsHttpsTrafficOnly\s*:\s*false", "desc": "HTTPS-only not enforced"},
+              {"id": "BICEP-004", "name": "No managed identity", "severity": "MEDIUM",
+               "pattern": r"(?:admin(?:Username|Password)|sql_admin)", "desc": "Uses passwords instead of managed identity"},
+              {"id": "BICEP-005", "name": "Public IP", "severity": "MEDIUM",
+               "pattern": r"Microsoft\.Network/publicIPAddresses|publicIPAllocationMethod", "desc": "Public IP address allocated"},
+              {"id": "BICEP-006", "name": "Missing diagnostic settings", "severity": "LOW",
+               "pattern": None, "desc": "No diagnostic settings configured (missing Microsoft.Insights/diagnosticSettings)"},
+              {"id": "BICEP-007", "name": "Hardcoded secrets", "severity": "CRITICAL",
+               "pattern": r"(?:password|secret|key)\s*:\s*['\"][^'\"]{8,}['\"]", "desc": "Hardcoded secret in template"},
+          ]
+
+          bicep_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if f.endswith('.bicep'):
+                      bicep_files.append(os.path.join(root, f))
+
+          findings = []
+          if not bicep_files:
+              print("ℹ️  No .bicep files found — running demo checks")
+              print("   Place Bicep files in infra/ to enable live scanning")
+              findings.append({"file": "N/A", "check": "BICEP-000", "severity": "INFO", "issue": "No Bicep templates found in repository"})
+          else:
+              for bf in bicep_files:
+                  print(f"\n📄 Scanning: {bf}")
+                  with open(bf) as f:
+                      content = f.read()
+
+                  file_findings = 0
+                  for check in BICEP_CHECKS:
+                      if check["pattern"]:
+                          matches = re.findall(check["pattern"], content, re.IGNORECASE)
+                          if matches:
+                              findings.append({"file": bf, "check": check["id"], "severity": check["severity"], "issue": check["desc"], "matches": len(matches)})
+                              print(f"  ⚠️  [{check['severity']}] {check['id']}: {check['name']} ({len(matches)} matches)")
+                              file_findings += 1
+                      elif check["id"] == "BICEP-006":
+                          if "diagnosticSettings" not in content and "Microsoft.Insights" not in content:
+                              findings.append({"file": bf, "check": check["id"], "severity": check["severity"], "issue": check["desc"]})
+                              print(f"  ⚠️  [{check['severity']}] {check['id']}: {check['name']}")
+                              file_findings += 1
+
+                  if file_findings == 0:
+                      print(f"  ✅ No issues found")
+
+          import json
+          with open("bicep-findings.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"\n✅ Bicep scan complete: {len(findings)} findings")
+          PYEOF
+
+      - name: "🔍 Scan Terraform Templates"
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json
+
+          print("=" * 50)
+          print("  🔍 Terraform Template Security Scan")
+          print("=" * 50)
+          print()
+
+          TF_CHECKS = [
+              {"id": "TF-001", "name": "Public access enabled", "severity": "HIGH",
+               "pattern": r'public_access_enabled\s*=\s*true|publicly_accessible\s*=\s*true'},
+              {"id": "TF-002", "name": "Encryption disabled", "severity": "HIGH",
+               "pattern": r'encryption_at_rest\s*=\s*false|encrypted\s*=\s*false|enable_https_traffic_only\s*=\s*false'},
+              {"id": "TF-003", "name": "Unrestricted security group", "severity": "CRITICAL",
+               "pattern": r'cidr_blocks\s*=\s*\[\s*"0\.0\.0\.0/0"\s*\]|source_address_prefix\s*=\s*"\*"'},
+              {"id": "TF-004", "name": "Hardcoded credentials", "severity": "CRITICAL",
+               "pattern": r'(?:password|secret_key|access_key)\s*=\s*"[^"]{8,}"'},
+              {"id": "TF-005", "name": "Missing logging", "severity": "MEDIUM",
+               "pattern": None, "desc_check": "logging"},
+              {"id": "TF-006", "name": "Default tags missing", "severity": "LOW",
+               "pattern": None, "desc_check": "tags"},
+              {"id": "TF-007", "name": "Unencrypted storage", "severity": "HIGH",
+               "pattern": r'server_side_encryption_configuration\s*\{\s*\}|sse_algorithm\s*=\s*"none"'},
+          ]
+
+          tf_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root or '.terraform' in root:
+                  continue
+              for f in files:
+                  if f.endswith('.tf'):
+                      tf_files.append(os.path.join(root, f))
+
+          findings = []
+          if not tf_files:
+              print("ℹ️  No .tf files found — running demo checks")
+              findings.append({"file": "N/A", "check": "TF-000", "severity": "INFO", "issue": "No Terraform templates found in repository"})
+          else:
+              for tf in tf_files:
+                  print(f"\n📄 Scanning: {tf}")
+                  with open(tf) as f:
+                      content = f.read()
+
+                  file_findings = 0
+                  for check in TF_CHECKS:
+                      if check.get("pattern"):
+                          matches = re.findall(check["pattern"], content, re.IGNORECASE)
+                          if matches:
+                              findings.append({"file": tf, "check": check["id"], "severity": check["severity"], "issue": check["name"], "matches": len(matches)})
+                              print(f"  ⚠️  [{check['severity']}] {check['id']}: {check['name']} ({len(matches)} matches)")
+                              file_findings += 1
+                      elif check.get("desc_check") == "logging":
+                          if "logging" not in content and "log_analytics" not in content and "monitor_diagnostic" not in content:
+                              findings.append({"file": tf, "check": check["id"], "severity": check["severity"], "issue": "No logging configuration found"})
+                              print(f"  ⚠️  [{check['severity']}] {check['id']}: {check['name']}")
+                              file_findings += 1
+                      elif check.get("desc_check") == "tags":
+                          if "tags" not in content:
+                              findings.append({"file": tf, "check": check["id"], "severity": check["severity"], "issue": "No tags defined"})
+                              print(f"  ⚠️  [{check['severity']}] {check['id']}: {check['name']}")
+                              file_findings += 1
+
+                  if file_findings == 0:
+                      print(f"  ✅ No issues found")
+
+          with open("terraform-findings.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"\n✅ Terraform scan complete: {len(findings)} findings")
+          PYEOF
+
+      - name: "📊 Generate IaC Security Report"
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime
+
+          report = []
+          report.append("# 🏗️ Infrastructure as Code Security Report")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append("")
+          report.append("---")
+
+          all_findings = []
+          for scan_file, label in [("bicep-findings.json", "Bicep"), ("terraform-findings.json", "Terraform")]:
+              report.append(f"\n## 🔍 {label} Security Findings")
+              try:
+                  with open(scan_file) as f:
+                      findings = json.load(f)
+                  all_findings.extend(findings)
+                  if findings:
+                      report.append(f"| Check | Severity | File | Issue |")
+                      report.append(f"|-------|----------|------|-------|")
+                      for item in findings:
+                          report.append(f"| `{item['check']}` | **{item['severity']}** | `{item['file']}` | {item['issue']} |")
+                  else:
+                      report.append("✅ No issues found.")
+              except FileNotFoundError:
+                  report.append(f"No {label} scan results available.")
+
+          # Summary scorecard
+          report.append("\n## 📊 Summary Scorecard")
+          severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
+          for f_item in all_findings:
+              sev = f_item.get("severity", "INFO")
+              severity_counts[sev] = severity_counts.get(sev, 0) + 1
+
+          report.append(f"| Severity | Count | Status |")
+          report.append(f"|----------|-------|--------|")
+          for sev in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+              count = severity_counts[sev]
+              status = "❌ FAIL" if count > 0 and sev in ("CRITICAL", "HIGH") else ("⚠️ WARN" if count > 0 else "✅ PASS")
+              report.append(f"| {sev} | {count} | {status} |")
+
+          overall = "❌ FAIL" if severity_counts["CRITICAL"] > 0 or severity_counts["HIGH"] > 0 else "✅ PASS"
+          report.append(f"\n**Overall IaC Security: {overall}**")
+          report.append("\n---")
+          report.append("*Report generated by IaC Security Check Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("iac-security-report.md", "w") as f:
+              f.write(full_report)
+          with open("$GITHUB_STEP_SUMMARY", "a") as f:
+              f.write(full_report)
+          print("📊 IaC security report generated: iac-security-report.md")
+          PYEOF
+
+      - name: "📤 Upload IaC Security Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iac-security-report
+          path: |
+            iac-security-report.md
+            bicep-findings.json
+            terraform-findings.json
+          retention-days: 30

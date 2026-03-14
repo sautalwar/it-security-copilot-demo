@@ -1,0 +1,283 @@
+name: "🚨 Incident Response Pipeline"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  incident-response:
+    name: "🚨 Incident Response"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "📋 Collect Incident Artifacts"
+        run: |
+          python3 << 'PYEOF'
+          import os, json, datetime
+
+          print("=" * 50)
+          print("  📋 Collecting Incident Artifacts")
+          print("=" * 50)
+          print()
+
+          artifacts = {"timestamp": datetime.datetime.utcnow().isoformat() + "Z", "files_found": [], "data_sources": []}
+
+          search_patterns = {
+              "dns_logs": ["dns_queries.log", "dns_log", "dns-log"],
+              "auth_logs": ["auth.log", "auth_log", "login_attempts"],
+              "network_logs": ["network_inventory", "network_log", "firewall_rules"],
+              "incident_data": ["incident", "alert", "ioc", "indicator"],
+              "security_configs": ["vpn_config", "firewall_rules", "security_policy"],
+          }
+
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  fpath = os.path.join(root, f)
+                  for category, patterns in search_patterns.items():
+                      if any(p in f.lower() for p in patterns):
+                          size = os.path.getsize(fpath)
+                          artifacts["files_found"].append({"file": fpath, "category": category, "size": size})
+                          if category not in artifacts["data_sources"]:
+                              artifacts["data_sources"].append(category)
+                          print(f"  📄 [{category}] {fpath} ({size} bytes)")
+
+          if not artifacts["files_found"]:
+              print("  ℹ️  No incident data files found in repository")
+              print("  Incident response will use sample data for demo")
+
+          print(f"\n📊 Collected {len(artifacts['files_found'])} artifacts from {len(artifacts['data_sources'])} data sources")
+
+          with open("incident-artifacts.json", "w") as f:
+              json.dump(artifacts, f, indent=2)
+          PYEOF
+
+      - name: "🔍 Correlate IOCs"
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json, math
+          from collections import Counter, defaultdict
+
+          print("=" * 50)
+          print("  🔍 IOC Correlation Analysis")
+          print("=" * 50)
+          print()
+
+          iocs = {"ip_addresses": [], "domains": [], "hashes": [], "urls": [], "emails": []}
+          correlations = []
+
+          IP_PATTERN = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b')
+          DOMAIN_PATTERN = re.compile(r'\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|io|ru|cn|tk|xyz|top|cc|info|biz)\b')
+          HASH_PATTERN = re.compile(r'\b[a-fA-F0-9]{32,64}\b')
+          EMAIL_PATTERN = re.compile(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b')
+
+          KNOWN_BAD_IPS = ["10.0.0.99", "192.168.1.200", "45.33.32.156", "198.51.100.1"]
+          KNOWN_BAD_DOMAINS = ["malware-c2.evil.com", "exfil.badactor.net", "c2-beacon.ru", "data-steal.cn"]
+
+          all_ips = Counter()
+          all_domains = Counter()
+          source_map = defaultdict(set)
+
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root or '.github' in root:
+                  continue
+              for fname in files:
+                  if not fname.endswith(('.log', '.json', '.txt', '.csv', '.yaml', '.yml')):
+                      continue
+                  fpath = os.path.join(root, fname)
+                  try:
+                      with open(fpath) as f:
+                          content = f.read()
+                  except (UnicodeDecodeError, PermissionError):
+                      continue
+
+                  found_ips = IP_PATTERN.findall(content)
+                  found_domains = DOMAIN_PATTERN.findall(content)
+
+                  for ip in found_ips:
+                      all_ips[ip] += 1
+                      source_map[ip].add(fpath)
+                  for domain in found_domains:
+                      all_domains[domain] += 1
+                      source_map[domain].add(fpath)
+
+          # Cross-reference with known bad
+          print("🚨 IOC Cross-Reference Results:")
+          print()
+
+          for ip in KNOWN_BAD_IPS:
+              if ip in all_ips:
+                  sources = list(source_map[ip])
+                  correlations.append({
+                      "type": "ip", "value": ip, "severity": "CRITICAL",
+                      "occurrences": all_ips[ip], "sources": sources,
+                      "note": "Matched known malicious IP"
+                  })
+                  print(f"  🚨 CRITICAL: IP {ip} found {all_ips[ip]}x in {len(sources)} source(s)")
+                  for s in sources:
+                      print(f"     └─ {s}")
+
+          for domain in KNOWN_BAD_DOMAINS:
+              if domain in all_domains:
+                  sources = list(source_map[domain])
+                  correlations.append({
+                      "type": "domain", "value": domain, "severity": "CRITICAL",
+                      "occurrences": all_domains[domain], "sources": sources,
+                      "note": "Matched known malicious domain"
+                  })
+                  print(f"  🚨 CRITICAL: Domain {domain} found {all_domains[domain]}x in {len(sources)} source(s)")
+                  for s in sources:
+                      print(f"     └─ {s}")
+
+          # IPs appearing across multiple sources
+          print("\n📊 Multi-Source IOC Correlations:")
+          for indicator, sources in source_map.items():
+              if len(sources) >= 2:
+                  correlations.append({
+                      "type": "multi_source", "value": indicator, "severity": "HIGH",
+                      "occurrences": all_ips.get(indicator, 0) + all_domains.get(indicator, 0),
+                      "sources": list(sources),
+                      "note": f"Appears in {len(sources)} different data sources"
+                  })
+                  print(f"  ⚠️  {indicator} → appears in {len(sources)} sources")
+
+          if not correlations:
+              print("  ℹ️  No IOC correlations found (add incident data files to enable)")
+
+          iocs["ip_addresses"] = [{"ip": ip, "count": c} for ip, c in all_ips.most_common(20)]
+          iocs["domains"] = [{"domain": d, "count": c} for d, c in all_domains.most_common(20)]
+
+          with open("ioc-correlations.json", "w") as f:
+              json.dump({"iocs": iocs, "correlations": correlations}, f, indent=2)
+          print(f"\n✅ IOC correlation complete: {len(correlations)} correlations found")
+          PYEOF
+
+      - name: "📊 Generate Incident Report"
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime
+
+          report = []
+          report.append("# 🚨 Incident Response Report")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append(f"**Classification:** Security Incident Investigation")
+          report.append("")
+          report.append("---")
+          report.append("")
+
+          # Executive Summary
+          report.append("## 📋 Executive Summary")
+          try:
+              with open("ioc-correlations.json") as f:
+                  data = json.load(f)
+              correlations = data.get("correlations", [])
+              critical = sum(1 for c in correlations if c["severity"] == "CRITICAL")
+              high = sum(1 for c in correlations if c["severity"] == "HIGH")
+              report.append(f"- **Critical IOCs:** {critical}")
+              report.append(f"- **High-severity correlations:** {high}")
+              report.append(f"- **Total indicators analyzed:** {len(data.get('iocs', {}).get('ip_addresses', [])) + len(data.get('iocs', {}).get('domains', []))}")
+          except FileNotFoundError:
+              report.append("No IOC correlation data available.")
+          report.append("")
+
+          # Artifacts collected
+          report.append("## 📂 Artifacts Collected")
+          try:
+              with open("incident-artifacts.json") as f:
+                  artifacts = json.load(f)
+              if artifacts["files_found"]:
+                  report.append("| Category | File | Size |")
+                  report.append("|----------|------|------|")
+                  for a in artifacts["files_found"]:
+                      report.append(f"| {a['category']} | `{a['file']}` | {a['size']} bytes |")
+              else:
+                  report.append("No incident data files found in repository.")
+          except FileNotFoundError:
+              report.append("Artifact collection data not available.")
+          report.append("")
+
+          # IOC Correlations
+          report.append("## 🔍 IOC Correlation Results")
+          try:
+              with open("ioc-correlations.json") as f:
+                  data = json.load(f)
+              correlations = data.get("correlations", [])
+              if correlations:
+                  report.append("| Severity | Type | Indicator | Occurrences | Sources | Note |")
+                  report.append("|----------|------|-----------|-------------|---------|------|")
+                  for c in sorted(correlations, key=lambda x: {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2}.get(x["severity"], 3)):
+                      emoji = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡"}.get(c["severity"], "⚪")
+                      sources_str = ", ".join(c["sources"][:2])
+                      report.append(f"| {emoji} **{c['severity']}** | {c['type']} | `{c['value']}` | {c['occurrences']} | {sources_str} | {c['note']} |")
+              else:
+                  report.append("No IOC correlations detected.")
+          except FileNotFoundError:
+              report.append("No IOC data available.")
+          report.append("")
+
+          # Recommendations
+          report.append("## 📝 Recommended Actions")
+          report.append("1. **Immediate:** Block all critical IOCs at firewall/proxy level")
+          report.append("2. **Short-term:** Rotate compromised credentials, revoke exposed tokens")
+          report.append("3. **Medium-term:** Conduct full forensic analysis of affected systems")
+          report.append("4. **Long-term:** Implement enhanced monitoring and detection rules")
+
+          report.append("")
+          report.append("---")
+          report.append("*Report generated by Incident Response Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("incident-report.md", "w") as f:
+              f.write(full_report)
+          with open("$GITHUB_STEP_SUMMARY", "a") as f:
+              f.write(full_report)
+          print("📊 Incident report generated: incident-report.md")
+          PYEOF
+
+      - name: "📧 Notify Stakeholders"
+        run: |
+          echo "============================================"
+          echo "  📧 Stakeholder Notification (Simulated)"
+          echo "============================================"
+          echo ""
+          echo "📨 The following stakeholders would be notified:"
+          echo ""
+          echo "  👤 CISO                    → ciso@contoso.com"
+          echo "     Subject: [INCIDENT] Security Investigation Report - Run #${{ github.run_number }}"
+          echo ""
+          echo "  👤 Security Operations     → secops@contoso.com"
+          echo "     Subject: [ACTION REQUIRED] IOC Correlation Results"
+          echo ""
+          echo "  👤 IT Operations           → itops@contoso.com"
+          echo "     Subject: [NOTICE] Incident Response Pipeline Complete"
+          echo ""
+          echo "  👤 Compliance Officer      → compliance@contoso.com"
+          echo "     Subject: [COMPLIANCE] Incident Documentation Available"
+          echo ""
+          echo "  📎 Attachment: incident-report.md"
+          echo "  🔗 Link: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
+          echo "  ⏰ Notification timestamp: $(date -u)"
+          echo ""
+          echo "✅ Notification simulation complete"
+          echo "   (In production, integrate with email/Teams/Slack/PagerDuty)"
+
+      - name: "📤 Upload Incident Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: incident-report
+          path: |
+            incident-report.md
+            incident-artifacts.json
+            ioc-correlations.json
+          retention-days: 90

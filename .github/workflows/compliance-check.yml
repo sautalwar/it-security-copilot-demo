@@ -1,0 +1,334 @@
+name: "📋 Compliance & Policy Check"
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  compliance-check:
+    name: "📋 Compliance & Policy Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "🔍 Check Policy Coverage"
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+
+          print("=" * 50)
+          print("  🔍 Policy Coverage Check")
+          print("=" * 50)
+          print()
+
+          REQUIRED_POLICIES = {
+              "encryption": {"keywords": ["encrypt", "tls", "ssl", "aes", "kms", "key vault"], "desc": "Data encryption at rest and in transit"},
+              "network_isolation": {"keywords": ["vnet", "subnet", "nsg", "firewall", "private endpoint", "network"], "desc": "Network segmentation and isolation"},
+              "logging": {"keywords": ["log", "monitor", "audit", "diagnostic", "siem", "alert"], "desc": "Logging, monitoring, and alerting"},
+              "secrets_management": {"keywords": ["key vault", "secret", "credential", "managed identity", "certificate"], "desc": "Secrets and credential management"},
+              "identity": {"keywords": ["identity", "rbac", "role", "authentication", "mfa", "conditional access"], "desc": "Identity and access management"},
+              "backup": {"keywords": ["backup", "recovery", "disaster", "rto", "rpo", "geo-redundant"], "desc": "Backup and disaster recovery"},
+              "compliance": {"keywords": ["compliance", "cis", "nist", "iso", "soc2", "hipaa", "gdpr"], "desc": "Regulatory compliance framework"},
+          }
+
+          policy_files = []
+          all_content = ""
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  fpath = os.path.join(root, f)
+                  if f.endswith(('.json', '.yaml', '.yml', '.md', '.txt', '.py', '.bicep', '.tf')):
+                      policy_files.append(fpath)
+                      try:
+                          with open(fpath) as fh:
+                              all_content += fh.read().lower() + "\n"
+                      except (UnicodeDecodeError, PermissionError):
+                          pass
+
+          findings = []
+          print(f"📋 Scanned {len(policy_files)} files for policy coverage\n")
+
+          for area, config in REQUIRED_POLICIES.items():
+              found_keywords = [kw for kw in config["keywords"] if kw in all_content]
+              covered = len(found_keywords) > 0
+              status = "COVERED" if covered else "MISSING"
+              emoji = "✅" if covered else "❌"
+              print(f"  {emoji} {area}: {config['desc']}")
+              if covered:
+                  print(f"     Keywords found: {', '.join(found_keywords[:3])}")
+              findings.append({"area": area, "description": config["desc"], "status": status, "keywords_found": found_keywords})
+
+          with open("policy-coverage.json", "w") as f:
+              json.dump(findings, f, indent=2)
+
+          covered_count = sum(1 for f_item in findings if f_item["status"] == "COVERED")
+          print(f"\n📊 Coverage: {covered_count}/{len(REQUIRED_POLICIES)} areas covered")
+          PYEOF
+
+      - name: "🔍 Validate Network Compliance"
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+
+          print("=" * 50)
+          print("  🔍 Network Compliance Validation")
+          print("=" * 50)
+          print()
+
+          CIS_NETWORK_CHECKS = [
+              {"id": "CIS-9.1", "name": "Network segmentation implemented", "check": "subnets"},
+              {"id": "CIS-9.2", "name": "NSG applied to all subnets", "check": "nsg"},
+              {"id": "CIS-9.3", "name": "No unrestricted inbound access", "check": "no_open_inbound"},
+              {"id": "CIS-9.4", "name": "Network flow logging enabled", "check": "flow_logs"},
+              {"id": "CIS-9.5", "name": "Private endpoints for PaaS services", "check": "private_endpoints"},
+              {"id": "CIS-12.1", "name": "DDoS protection enabled", "check": "ddos"},
+              {"id": "CIS-12.2", "name": "WAF deployed on public endpoints", "check": "waf"},
+          ]
+
+          net_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if 'network' in f.lower() and f.endswith('.json'):
+                      net_files.append(os.path.join(root, f))
+
+          findings = []
+          if net_files:
+              for nf in net_files:
+                  print(f"📄 Checking: {nf}")
+                  with open(nf) as f:
+                      data = json.load(f)
+                  content = json.dumps(data).lower()
+
+                  for check in CIS_NETWORK_CHECKS:
+                      if check["check"] == "subnets":
+                          passed = "subnet" in content
+                      elif check["check"] == "nsg":
+                          passed = "nsg" in content or "security_group" in content or "networkSecurityGroup" in content.replace(" ", "")
+                      elif check["check"] == "no_open_inbound":
+                          passed = "0.0.0.0/0" not in content or "deny" in content
+                      elif check["check"] == "flow_logs":
+                          passed = "flow" in content and "log" in content
+                      elif check["check"] == "private_endpoints":
+                          passed = "private" in content and "endpoint" in content
+                      elif check["check"] == "ddos":
+                          passed = "ddos" in content
+                      elif check["check"] == "waf":
+                          passed = "waf" in content
+                      else:
+                          passed = False
+
+                      status = "PASS" if passed else "FAIL"
+                      emoji = "✅" if passed else "❌"
+                      print(f"  {emoji} {check['id']}: {check['name']}")
+                      findings.append({"id": check["id"], "name": check["name"], "status": status})
+          else:
+              print("ℹ️  No network_inventory.json found — all checks marked as N/A")
+              for check in CIS_NETWORK_CHECKS:
+                  print(f"  ⏭️  {check['id']}: {check['name']} — N/A")
+                  findings.append({"id": check["id"], "name": check["name"], "status": "N/A"})
+
+          with open("network-compliance.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          PYEOF
+
+      - name: "🔍 VPN Configuration Audit"
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+
+          print("=" * 50)
+          print("  🔍 VPN Configuration Audit")
+          print("=" * 50)
+          print()
+
+          WEAK_CRYPTO = {
+              "ciphers": ["des", "3des", "rc4", "blowfish", "null"],
+              "hashes": ["md5", "sha1"],
+              "dh_groups": ["1", "2", "5"],
+              "protocols": ["ikev1", "pptp", "l2tp"],
+          }
+
+          STRONG_CRYPTO = {
+              "ciphers": ["aes-256", "aes-128-gcm", "chacha20"],
+              "hashes": ["sha256", "sha384", "sha512"],
+              "dh_groups": ["14", "19", "20", "21"],
+              "protocols": ["ikev2", "wireguard", "openvpn"],
+          }
+
+          vpn_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if 'vpn' in f.lower() and f.endswith('.json'):
+                      vpn_files.append(os.path.join(root, f))
+
+          findings = []
+          if vpn_files:
+              for vf in vpn_files:
+                  print(f"📄 Auditing: {vf}")
+                  with open(vf) as f:
+                      data = json.load(f)
+                  content = json.dumps(data).lower()
+
+                  # Check for weak ciphers
+                  for weak in WEAK_CRYPTO["ciphers"]:
+                      if weak in content:
+                          findings.append({"file": vf, "type": "weak_cipher", "value": weak, "severity": "CRITICAL"})
+                          print(f"  🚨 CRITICAL: Weak cipher detected: {weak}")
+
+                  for weak in WEAK_CRYPTO["hashes"]:
+                      if weak in content and f"{weak}(" not in content:
+                          findings.append({"file": vf, "type": "weak_hash", "value": weak, "severity": "HIGH"})
+                          print(f"  ⚠️  HIGH: Weak hash algorithm: {weak}")
+
+                  for weak in WEAK_CRYPTO["protocols"]:
+                      if weak in content:
+                          findings.append({"file": vf, "type": "weak_protocol", "value": weak, "severity": "HIGH"})
+                          print(f"  ⚠️  HIGH: Weak/deprecated protocol: {weak}")
+
+                  for weak in WEAK_CRYPTO["dh_groups"]:
+                      if f'"group": {weak}' in content or f'"dh_group": {weak}' in content or f'"group{weak}"' in content:
+                          findings.append({"file": vf, "type": "weak_dh", "value": f"group{weak}", "severity": "HIGH"})
+                          print(f"  ⚠️  HIGH: Weak DH group: group{weak}")
+
+                  if not findings:
+                      print(f"  ✅ No weak cryptography detected in {vf}")
+          else:
+              print("ℹ️  No vpn_config.json found")
+              print("   VPN audit will run when config files are added")
+
+          with open("vpn-findings.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"\n✅ VPN audit complete: {len(findings)} issues found")
+          PYEOF
+
+      - name: "📊 Compliance Dashboard"
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime
+
+          report = []
+          report.append("# 📋 Compliance & Policy Dashboard")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append("")
+          report.append("---")
+          report.append("")
+
+          # Compliance Scorecard
+          report.append("## 📊 Compliance Scorecard")
+          report.append("")
+          scorecard = []
+
+          # Policy coverage
+          try:
+              with open("policy-coverage.json") as f:
+                  policies = json.load(f)
+              covered = sum(1 for p in policies if p["status"] == "COVERED")
+              total = len(policies)
+              pct = int(covered / total * 100) if total > 0 else 0
+              scorecard.append(("Policy Coverage", f"{covered}/{total} ({pct}%)", "✅ PASS" if pct >= 80 else "❌ FAIL"))
+          except FileNotFoundError:
+              scorecard.append(("Policy Coverage", "N/A", "⏭️ N/A"))
+
+          # Network compliance
+          try:
+              with open("network-compliance.json") as f:
+                  network = json.load(f)
+              passed = sum(1 for n in network if n["status"] == "PASS")
+              total = len([n for n in network if n["status"] != "N/A"])
+              total = total if total > 0 else len(network)
+              scorecard.append(("Network Compliance", f"{passed}/{total}", "✅ PASS" if passed == total else "❌ FAIL"))
+          except FileNotFoundError:
+              scorecard.append(("Network Compliance", "N/A", "⏭️ N/A"))
+
+          # VPN audit
+          try:
+              with open("vpn-findings.json") as f:
+                  vpn = json.load(f)
+              critical = sum(1 for v in vpn if v.get("severity") == "CRITICAL")
+              scorecard.append(("VPN Security", f"{len(vpn)} issues", "✅ PASS" if len(vpn) == 0 else "❌ FAIL"))
+          except FileNotFoundError:
+              scorecard.append(("VPN Security", "N/A", "⏭️ N/A"))
+
+          report.append("| Control Area | Result | Status |")
+          report.append("|-------------|--------|--------|")
+          for area, result, status in scorecard:
+              report.append(f"| {area} | {result} | {status} |")
+          report.append("")
+
+          # Detailed sections
+          report.append("## 📋 Policy Coverage Details")
+          try:
+              with open("policy-coverage.json") as f:
+                  policies = json.load(f)
+              report.append("| Policy Area | Description | Status |")
+              report.append("|------------|-------------|--------|")
+              for p in policies:
+                  emoji = "✅" if p["status"] == "COVERED" else "❌"
+                  report.append(f"| {p['area']} | {p['description']} | {emoji} {p['status']} |")
+          except FileNotFoundError:
+              report.append("No policy data available.")
+          report.append("")
+
+          report.append("## 🌐 Network Compliance")
+          try:
+              with open("network-compliance.json") as f:
+                  network = json.load(f)
+              report.append("| CIS Control | Check | Status |")
+              report.append("|------------|-------|--------|")
+              for n in network:
+                  emoji = {"PASS": "✅", "FAIL": "❌", "N/A": "⏭️"}.get(n["status"], "❓")
+                  report.append(f"| {n['id']} | {n['name']} | {emoji} {n['status']} |")
+          except FileNotFoundError:
+              report.append("No network compliance data available.")
+          report.append("")
+
+          report.append("## 🔐 VPN Security")
+          try:
+              with open("vpn-findings.json") as f:
+                  vpn = json.load(f)
+              if vpn:
+                  report.append("| Severity | Issue Type | Value | File |")
+                  report.append("|----------|-----------|-------|------|")
+                  for v in vpn:
+                      report.append(f"| **{v['severity']}** | {v['type']} | `{v['value']}` | `{v['file']}` |")
+              else:
+                  report.append("✅ No VPN security issues found.")
+          except FileNotFoundError:
+              report.append("No VPN audit data available.")
+
+          report.append("")
+          report.append("---")
+          report.append("*Report generated by Compliance & Policy Check Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("compliance-report.md", "w") as f:
+              f.write(full_report)
+          with open("$GITHUB_STEP_SUMMARY", "a") as f:
+              f.write(full_report)
+          print("📊 Compliance dashboard generated: compliance-report.md")
+          PYEOF
+
+      - name: "📤 Upload Compliance Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compliance-report
+          path: |
+            compliance-report.md
+            policy-coverage.json
+            network-compliance.json
+            vpn-findings.json
+          retention-days: 30

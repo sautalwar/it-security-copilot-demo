@@ -1,0 +1,246 @@
+name: "🛡️ Firewall Rule Validation"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  firewall-validation:
+    name: "🛡️ Firewall Validation"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "🔍 Audit Current Firewall Rules"
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+
+          print("=" * 50)
+          print("  🔍 Firewall Rule Audit")
+          print("=" * 50)
+          print()
+
+          findings = []
+          fw_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if 'firewall' in f.lower() and f.endswith('.json'):
+                      fw_files.append(os.path.join(root, f))
+
+          if not fw_files:
+              print("⚠️  No firewall_rules.json found — running demo audit")
+              demo_rules = [
+                  {"name": "AllowAll-Inbound", "direction": "inbound", "action": "allow", "source": "0.0.0.0/0", "destination": "*", "port": "*", "protocol": "*", "priority": 100},
+                  {"name": "Allow-SSH-Any", "direction": "inbound", "action": "allow", "source": "0.0.0.0/0", "destination": "*", "port": "22", "protocol": "tcp", "priority": 200},
+                  {"name": "Allow-RDP-Any", "direction": "inbound", "action": "allow", "source": "0.0.0.0/0", "destination": "*", "port": "3389", "protocol": "tcp", "priority": 300},
+                  {"name": "Allow-HTTP", "direction": "inbound", "action": "allow", "source": "10.0.0.0/8", "destination": "*", "port": "80,443", "protocol": "tcp", "priority": 400},
+              ]
+              fw_files = ["(demo rules)"]
+              rules_data = {"rules": demo_rules}
+          else:
+              with open(fw_files[0]) as f:
+                  rules_data = json.load(f)
+
+          rules = rules_data.get("rules", rules_data if isinstance(rules_data, list) else [])
+          print(f"📋 Total rules to audit: {len(rules)}")
+          print()
+
+          for rule in rules:
+              name = rule.get("name", "unnamed")
+              src = rule.get("source", "")
+              dst = rule.get("destination", "")
+              port = str(rule.get("port", ""))
+              action = rule.get("action", "")
+              direction = rule.get("direction", "")
+
+              # Check: Allow all traffic
+              if action == "allow" and src in ("0.0.0.0/0", "*", "any") and port in ("*", "any", "0-65535"):
+                  findings.append({"rule": name, "severity": "CRITICAL", "issue": "Allows ALL traffic from ANY source", "recommendation": "Restrict to specific IPs and ports"})
+                  print(f"  🚨 CRITICAL: {name} — allows all traffic from any source")
+
+              # Check: SSH from any
+              elif action == "allow" and src in ("0.0.0.0/0", "*", "any") and "22" in port:
+                  findings.append({"rule": name, "severity": "HIGH", "issue": "SSH open to internet", "recommendation": "Restrict SSH to bastion/VPN IPs only"})
+                  print(f"  ⚠️  HIGH: {name} — SSH open to internet")
+
+              # Check: RDP from any
+              elif action == "allow" and src in ("0.0.0.0/0", "*", "any") and "3389" in port:
+                  findings.append({"rule": name, "severity": "HIGH", "issue": "RDP open to internet", "recommendation": "Restrict RDP to VPN/jump box only"})
+                  print(f"  ⚠️  HIGH: {name} — RDP open to internet")
+
+              # Check: overly broad source
+              elif action == "allow" and src in ("0.0.0.0/0", "*", "any"):
+                  findings.append({"rule": name, "severity": "MEDIUM", "issue": f"Broad source ({src}) on port {port}", "recommendation": "Restrict source CIDR"})
+                  print(f"  ⚠️  MEDIUM: {name} — broad source on port {port}")
+
+              else:
+                  print(f"  ✅ OK: {name}")
+
+          # Check for missing egress filtering
+          egress_rules = [r for r in rules if r.get("direction") == "egress" or r.get("direction") == "outbound"]
+          if not egress_rules:
+              findings.append({"rule": "N/A", "severity": "HIGH", "issue": "No egress filtering rules defined", "recommendation": "Add egress rules to prevent data exfiltration"})
+              print(f"\n  ⚠️  HIGH: No egress filtering rules found!")
+
+          with open("firewall-findings.json", "w") as f:
+              json.dump(findings, f, indent=2)
+
+          print(f"\n✅ Audit complete: {len(findings)} issues found")
+          PYEOF
+
+      - name: "✅ Validate Hardened Rules"
+        run: |
+          python3 << 'PYEOF'
+          import os, json, glob
+
+          print("=" * 50)
+          print("  ✅ Hardened Rules Validation")
+          print("=" * 50)
+          print()
+
+          hardened_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if 'hardened' in f.lower() and f.endswith('.json'):
+                      hardened_files.append(os.path.join(root, f))
+                  elif 'firewall' in f.lower() and 'fix' in f.lower() and f.endswith('.json'):
+                      hardened_files.append(os.path.join(root, f))
+
+          checks = []
+          BEST_PRACTICES = {
+              "no_allow_all": "No 'allow all' rules",
+              "no_public_ssh": "SSH restricted to private subnets",
+              "no_public_rdp": "RDP restricted to private subnets",
+              "egress_filtering": "Egress filtering enabled",
+              "default_deny": "Default deny rule present",
+              "logging_enabled": "Logging enabled on rules",
+          }
+
+          if hardened_files:
+              for hf in hardened_files:
+                  print(f"📄 Validating: {hf}")
+                  with open(hf) as f:
+                      data = json.load(f)
+                  rules = data.get("rules", data if isinstance(data, list) else [])
+
+                  has_allow_all = any(r.get("source") in ("0.0.0.0/0", "*") and r.get("port") in ("*", "any") for r in rules)
+                  has_public_ssh = any(r.get("source") in ("0.0.0.0/0", "*") and "22" in str(r.get("port", "")) for r in rules)
+                  has_public_rdp = any(r.get("source") in ("0.0.0.0/0", "*") and "3389" in str(r.get("port", "")) for r in rules)
+                  has_egress = any(r.get("direction") in ("egress", "outbound") for r in rules)
+                  has_deny = any(r.get("action") == "deny" for r in rules)
+
+                  checks = [
+                      ("no_allow_all", not has_allow_all),
+                      ("no_public_ssh", not has_public_ssh),
+                      ("no_public_rdp", not has_public_rdp),
+                      ("egress_filtering", has_egress),
+                      ("default_deny", has_deny),
+                  ]
+                  for check_id, passed in checks:
+                      status = "✅ PASS" if passed else "❌ FAIL"
+                      print(f"  {status}: {BEST_PRACTICES[check_id]}")
+          else:
+              print("ℹ️  No hardened firewall rules found yet")
+              print("   This check will validate hardened rules after remediation")
+              checks = [(k, False) for k in BEST_PRACTICES if k != "logging_enabled"]
+              for check_id, _ in checks:
+                  print(f"  ⏭️  SKIP: {BEST_PRACTICES[check_id]} (no hardened rules)")
+
+          with open("hardened-validation.json", "w") as f:
+              json.dump([{"check": c[0], "passed": c[1]} for c in checks], f, indent=2)
+          PYEOF
+
+      - name: "📊 Generate Compliance Report"
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime
+
+          report = []
+          report.append("# 🛡️ Firewall Rule Validation Report")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append("")
+          report.append("---")
+          report.append("")
+
+          # CIS Benchmark mapping
+          report.append("## 📋 CIS Benchmark Compliance")
+          report.append("")
+          CIS_CONTROLS = [
+              ("4.1", "Establish and Maintain a Firewall Policy", "firewall-findings.json"),
+              ("4.2", "Restrict Inbound Network Traffic", "firewall-findings.json"),
+              ("4.3", "Restrict Outbound Network Traffic", "firewall-findings.json"),
+              ("4.4", "Configure Trusted DNS Servers", None),
+              ("4.5", "Implement Default-Deny Firewall Rules", "hardened-validation.json"),
+          ]
+
+          report.append("| CIS Control | Description | Status |")
+          report.append("|-------------|-------------|--------|")
+
+          try:
+              with open("firewall-findings.json") as f:
+                  findings = json.load(f)
+              critical = sum(1 for f_item in findings if f_item["severity"] == "CRITICAL")
+              high = sum(1 for f_item in findings if f_item["severity"] == "HIGH")
+          except FileNotFoundError:
+              findings = []
+              critical = high = 0
+
+          for cid, desc, _ in CIS_CONTROLS:
+              if cid in ("4.1", "4.2") and critical > 0:
+                  status = "❌ FAIL"
+              elif cid == "4.3" and any(f_item.get("issue", "").startswith("No egress") for f_item in findings):
+                  status = "❌ FAIL"
+              elif cid == "4.4":
+                  status = "⏭️ N/A"
+              elif cid == "4.5":
+                  status = "❌ FAIL" if critical > 0 else "✅ PASS"
+              else:
+                  status = "✅ PASS"
+              report.append(f"| {cid} | {desc} | {status} |")
+
+          report.append("")
+
+          # Detailed findings
+          report.append("## 🔍 Detailed Findings")
+          if findings:
+              report.append("| Rule | Severity | Issue | Recommendation |")
+              report.append("|------|----------|-------|----------------|")
+              for f_item in findings:
+                  report.append(f"| `{f_item['rule']}` | **{f_item['severity']}** | {f_item['issue']} | {f_item['recommendation']} |")
+          else:
+              report.append("✅ No issues found.")
+
+          report.append("")
+          report.append("---")
+          report.append("*Report generated by Firewall Validation Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("firewall-report.md", "w") as f:
+              f.write(full_report)
+          with open("$GITHUB_STEP_SUMMARY", "a") as f:
+              f.write(full_report)
+          print("📊 Firewall compliance report generated: firewall-report.md")
+          PYEOF
+
+      - name: "📤 Upload Firewall Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: firewall-report
+          path: |
+            firewall-report.md
+            firewall-findings.json
+            hardened-validation.json
+          retention-days: 30

@@ -1,0 +1,275 @@
+name: "🌐 DNS Threat Detection"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dns-threat-detection:
+    name: "🌐 DNS Threat Detection"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "📋 Analyze DNS Logs"
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json, math
+          from collections import Counter, defaultdict
+          from datetime import datetime
+
+          print("=" * 50)
+          print("  📋 DNS Log Analysis")
+          print("=" * 50)
+          print()
+
+          log_file = "vulnerable-app/dns_queries.log"
+          findings = []
+
+          KNOWN_BAD_DOMAINS = [
+              "malware-c2.evil.com", "exfil.badactor.net", "phishing-kit.xyz",
+              "cryptominer.pool.io", "darkweb-proxy.onion.ws", "c2-beacon.ru",
+              "data-steal.cn", "ransomware-drop.tk", "botnet-controller.cc",
+          ]
+
+          SUSPICIOUS_TLDS = [".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top", ".buzz", ".click"]
+
+          def entropy(s):
+              if not s:
+                  return 0
+              freq = Counter(s)
+              length = len(s)
+              return -sum((c / length) * math.log2(c / length) for c in freq.values())
+
+          if os.path.exists(log_file):
+              print(f"📄 Reading: {log_file}")
+              with open(log_file) as f:
+                  lines = f.readlines()
+              print(f"   Total log entries: {len(lines)}")
+
+              domain_counts = Counter()
+              client_queries = defaultdict(list)
+              high_entropy_domains = []
+
+              for line in lines:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  parts = line.split()
+                  domain = parts[-1] if parts else line
+                  client = parts[2] if len(parts) > 2 else "unknown"
+
+                  domain_counts[domain] += 1
+                  client_queries[client].append(domain)
+
+                  subdomain = domain.split('.')[0]
+                  ent = entropy(subdomain)
+                  if ent > 3.5 and len(subdomain) > 10:
+                      high_entropy_domains.append((domain, ent))
+
+              # Check for known bad domains
+              print("\n🚨 Known Bad Domain Matches:")
+              for bad in KNOWN_BAD_DOMAINS:
+                  for queried in domain_counts:
+                      if bad in queried or queried in bad:
+                          msg = f"  ⚠️  MATCH: {queried} (queried {domain_counts[queried]}x)"
+                          print(msg)
+                          findings.append({"type": "known_bad", "domain": queried, "count": domain_counts[queried], "severity": "CRITICAL"})
+
+              # Check suspicious TLDs
+              print("\n🔍 Suspicious TLD Analysis:")
+              for domain, count in domain_counts.most_common():
+                  for tld in SUSPICIOUS_TLDS:
+                      if domain.endswith(tld):
+                          msg = f"  ⚠️  Suspicious TLD: {domain} ({count} queries)"
+                          print(msg)
+                          findings.append({"type": "suspicious_tld", "domain": domain, "count": count, "severity": "MEDIUM"})
+
+              # High-frequency queries (potential beaconing)
+              print("\n📊 High-Frequency Queries (potential beaconing):")
+              for domain, count in domain_counts.most_common(10):
+                  if count > 5:
+                      print(f"  ⚠️  {domain}: {count} queries")
+                      findings.append({"type": "high_frequency", "domain": domain, "count": count, "severity": "MEDIUM"})
+
+              # High entropy subdomains
+              if high_entropy_domains:
+                  print(f"\n🔬 High Entropy Subdomains ({len(high_entropy_domains)} found):")
+                  for domain, ent in sorted(high_entropy_domains, key=lambda x: -x[1])[:10]:
+                      print(f"  ⚠️  {domain} (entropy: {ent:.2f})")
+                      findings.append({"type": "high_entropy", "domain": domain, "entropy": round(ent, 2), "severity": "HIGH"})
+          else:
+              print(f"⚠️  DNS log file not found: {log_file}")
+              print("   Generating sample analysis output for demo...")
+              sample_domains = [
+                  ("aGVsbG8gd29ybGQ.exfil.badactor.net", 4.1, "CRITICAL"),
+                  ("dXNlcm5hbWU6c.data-steal.cn", 3.9, "HIGH"),
+                  ("ZXhmaWx0cmF0ZQ.c2-beacon.ru", 4.0, "HIGH"),
+              ]
+              for domain, ent, sev in sample_domains:
+                  findings.append({"type": "high_entropy", "domain": domain, "entropy": ent, "severity": sev})
+                  print(f"  ⚠️  [{sev}] {domain} (entropy: {ent})")
+
+          with open("dns-findings.json", "w") as f:
+              json.dump(findings, f, indent=2)
+          print(f"\n✅ Analysis complete: {len(findings)} findings")
+          PYEOF
+
+      - name: "🚨 Check for DNS Tunneling"
+        run: |
+          python3 << 'PYEOF'
+          import os, re, math, json
+          from collections import Counter
+
+          print("=" * 50)
+          print("  🚨 DNS Tunneling Detection")
+          print("=" * 50)
+          print()
+
+          def entropy(s):
+              if not s:
+                  return 0
+              freq = Counter(s)
+              length = len(s)
+              return -sum((c / length) * math.log2(c / length) for c in freq.values())
+
+          def is_base64_like(s):
+              b64_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+              if len(s) < 8:
+                  return False
+              ratio = sum(1 for c in s if c in b64_chars) / len(s)
+              return ratio > 0.9 and entropy(s) > 3.5
+
+          def is_hex_like(s):
+              hex_chars = set("0123456789abcdefABCDEF")
+              if len(s) < 12:
+                  return False
+              return all(c in hex_chars for c in s)
+
+          tunneling_indicators = []
+          log_file = "vulnerable-app/dns_queries.log"
+
+          if os.path.exists(log_file):
+              with open(log_file) as f:
+                  lines = f.readlines()
+
+              for line in lines:
+                  parts = line.strip().split()
+                  domain = parts[-1] if parts else line.strip()
+                  subdomains = domain.split('.')
+
+                  for sub in subdomains:
+                      if is_base64_like(sub):
+                          tunneling_indicators.append({
+                              "domain": domain, "subdomain": sub,
+                              "pattern": "base64", "entropy": round(entropy(sub), 2),
+                              "severity": "CRITICAL"
+                          })
+                          print(f"  🚨 BASE64 TUNNELING: {domain}")
+                          print(f"     Subdomain: {sub} (entropy: {entropy(sub):.2f})")
+                      elif is_hex_like(sub):
+                          tunneling_indicators.append({
+                              "domain": domain, "subdomain": sub,
+                              "pattern": "hex_encoding", "entropy": round(entropy(sub), 2),
+                              "severity": "HIGH"
+                          })
+                          print(f"  ⚠️  HEX ENCODING: {domain}")
+                          print(f"     Subdomain: {sub}")
+                      elif len(sub) > 30 and entropy(sub) > 3.8:
+                          tunneling_indicators.append({
+                              "domain": domain, "subdomain": sub,
+                              "pattern": "long_random", "entropy": round(entropy(sub), 2),
+                              "severity": "HIGH"
+                          })
+                          print(f"  ⚠️  LONG RANDOM: {domain}")
+                          print(f"     Subdomain length: {len(sub)}, entropy: {entropy(sub):.2f}")
+          else:
+              print("⚠️  DNS log not found — using sample tunneling indicators")
+              tunneling_indicators = [
+                  {"domain": "aGVsbG8gd29ybGQ.evil.com", "subdomain": "aGVsbG8gd29ybGQ", "pattern": "base64", "entropy": 3.91, "severity": "CRITICAL"},
+                  {"domain": "4f7263686573747261.c2.net", "subdomain": "4f7263686573747261", "pattern": "hex_encoding", "entropy": 3.56, "severity": "HIGH"},
+              ]
+              for t in tunneling_indicators:
+                  print(f"  🚨 [{t['severity']}] {t['pattern'].upper()}: {t['domain']}")
+
+          with open("tunneling-findings.json", "w") as f:
+              json.dump(tunneling_indicators, f, indent=2)
+
+          print(f"\n{'🚨 ALERT' if tunneling_indicators else '✅ CLEAR'}: {len(tunneling_indicators)} tunneling indicators found")
+          PYEOF
+
+      - name: "📊 Generate Threat Report"
+        run: |
+          python3 << 'PYEOF'
+          import json, datetime
+
+          report = []
+          report.append("# 🌐 DNS Threat Detection Report")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append("")
+          report.append("---")
+          report.append("")
+
+          # DNS findings
+          report.append("## 📋 DNS Log Analysis Findings")
+          try:
+              with open("dns-findings.json") as f:
+                  findings = json.load(f)
+              if findings:
+                  severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+                  findings.sort(key=lambda x: severity_order.get(x.get("severity", "LOW"), 9))
+                  report.append(f"| Severity | Type | Domain | Details |")
+                  report.append(f"|----------|------|--------|---------|")
+                  for f_item in findings:
+                      details = f_item.get("count", f_item.get("entropy", ""))
+                      report.append(f"| **{f_item['severity']}** | {f_item['type']} | `{f_item['domain']}` | {details} |")
+              else:
+                  report.append("✅ No DNS threats detected.")
+          except FileNotFoundError:
+              report.append("No DNS analysis results available.")
+          report.append("")
+
+          # Tunneling findings
+          report.append("## 🚨 DNS Tunneling Analysis")
+          try:
+              with open("tunneling-findings.json") as f:
+                  tunneling = json.load(f)
+              if tunneling:
+                  report.append(f"**{len(tunneling)} tunneling indicators detected!**")
+                  report.append("")
+                  for t in tunneling:
+                      report.append(f"- **[{t['severity']}]** `{t['domain']}` — Pattern: {t['pattern']} (entropy: {t['entropy']})")
+              else:
+                  report.append("✅ No DNS tunneling indicators detected.")
+          except FileNotFoundError:
+              report.append("No tunneling analysis results available.")
+
+          report.append("")
+          report.append("---")
+          report.append("*Report generated by DNS Threat Detection Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("dns-threat-report.md", "w") as f:
+              f.write(full_report)
+          with open("$GITHUB_STEP_SUMMARY", "a") as f:
+              f.write(full_report)
+          print("📊 DNS threat report generated: dns-threat-report.md")
+          PYEOF
+
+      - name: "📤 Upload DNS Threat Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dns-threat-report
+          path: |
+            dns-threat-report.md
+            dns-findings.json
+            tunneling-findings.json
+          retention-days: 30

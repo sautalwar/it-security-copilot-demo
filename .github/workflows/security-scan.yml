@@ -1,0 +1,235 @@
+name: "🔒 Security Scan — Code & Dependencies"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  security-scan:
+    name: "🔒 Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python 3.11"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "🔍 Scan for Hardcoded Secrets"
+        run: |
+          echo "============================================"
+          echo "  🔍 Scanning for Hardcoded Secrets"
+          echo "============================================"
+          echo ""
+
+          REPORT="secrets-report.txt"
+          echo "# Hardcoded Secrets Scan Report" > "$REPORT"
+          echo "Date: $(date -u)" >> "$REPORT"
+          echo "---" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          FOUND=0
+
+          # AWS Access Keys
+          echo "## Scanning for AWS Access Keys..." | tee -a "$REPORT"
+          if grep -rn --include="*.py" --include="*.js" --include="*.ts" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" --include="*.cfg" --include="*.ini" \
+            -E "(AKIA[0-9A-Z]{16}|aws_access_key_id\s*=\s*['\"][A-Z0-9]+)" . 2>/dev/null | grep -v ".github/workflows" | head -20; then
+            echo "⚠️  Potential AWS keys found!" | tee -a "$REPORT"
+            FOUND=$((FOUND + 1))
+          else
+            echo "✅ No AWS keys detected" | tee -a "$REPORT"
+          fi
+          echo "" >> "$REPORT"
+
+          # GitHub Tokens
+          echo "## Scanning for GitHub Tokens..." | tee -a "$REPORT"
+          if grep -rn --include="*.py" --include="*.js" --include="*.ts" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" \
+            -E "(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82}|gh[pousr]_[A-Za-z0-9_]{36,255})" . 2>/dev/null | grep -v ".github/workflows" | head -20; then
+            echo "⚠️  Potential GitHub tokens found!" | tee -a "$REPORT"
+            FOUND=$((FOUND + 1))
+          else
+            echo "✅ No GitHub tokens detected" | tee -a "$REPORT"
+          fi
+          echo "" >> "$REPORT"
+
+          # Generic API Keys & Passwords
+          echo "## Scanning for Generic Secrets..." | tee -a "$REPORT"
+          if grep -rn --include="*.py" --include="*.js" --include="*.ts" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" --include="*.cfg" \
+            -iE "(password\s*=\s*['\"][^'\"]+['\"]|api_key\s*=\s*['\"][^'\"]+['\"]|secret\s*=\s*['\"][^'\"]+['\"]|token\s*=\s*['\"][A-Za-z0-9+/=]{20,}['\"])" . 2>/dev/null | grep -v ".github/workflows" | head -20; then
+            echo "⚠️  Potential hardcoded secrets found!" | tee -a "$REPORT"
+            FOUND=$((FOUND + 1))
+          else
+            echo "✅ No generic secrets detected" | tee -a "$REPORT"
+          fi
+          echo "" >> "$REPORT"
+
+          # Private Keys
+          echo "## Scanning for Private Keys..." | tee -a "$REPORT"
+          if grep -rn -l "BEGIN.*PRIVATE KEY" . 2>/dev/null | grep -v ".github/workflows" | head -10; then
+            echo "⚠️  Private key files found!" | tee -a "$REPORT"
+            FOUND=$((FOUND + 1))
+          else
+            echo "✅ No private key files detected" | tee -a "$REPORT"
+          fi
+          echo "" >> "$REPORT"
+
+          # Connection Strings
+          echo "## Scanning for Connection Strings..." | tee -a "$REPORT"
+          if grep -rn --include="*.py" --include="*.js" --include="*.ts" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.env" \
+            -iE "(Server=.*Password=|mongodb\+srv://[^@]+@|postgresql://[^@]+@|mysql://[^@]+@)" . 2>/dev/null | grep -v ".github/workflows" | head -20; then
+            echo "⚠️  Potential connection strings found!" | tee -a "$REPORT"
+            FOUND=$((FOUND + 1))
+          else
+            echo "✅ No connection strings detected" | tee -a "$REPORT"
+          fi
+
+          echo "" >> "$REPORT"
+          echo "---" >> "$REPORT"
+          echo "Total categories with findings: $FOUND" >> "$REPORT"
+
+          echo ""
+          echo "============================================"
+          echo "  Secrets scan complete: $FOUND categories flagged"
+          echo "============================================"
+
+      - name: "🔍 Scan for Vulnerable Dependencies"
+        run: |
+          echo "============================================"
+          echo "  🔍 Scanning Dependencies for Vulnerabilities"
+          echo "============================================"
+          echo ""
+
+          python3 << 'PYEOF'
+          import os, re, sys
+
+          report_lines = ["# Dependency Vulnerability Report", f"Date: {__import__('datetime').datetime.utcnow().isoformat()}Z", "---", ""]
+
+          KNOWN_VULNS = {
+              "flask": {"below": "2.3.0", "cve": "CVE-2023-30861", "severity": "HIGH", "desc": "Session cookie vulnerability"},
+              "django": {"below": "4.2.0", "cve": "CVE-2023-36053", "severity": "HIGH", "desc": "Regex DoS in EmailValidator"},
+              "requests": {"below": "2.31.0", "cve": "CVE-2023-32681", "severity": "MEDIUM", "desc": "Leaking Proxy-Authorization headers"},
+              "cryptography": {"below": "41.0.0", "cve": "CVE-2023-38325", "severity": "HIGH", "desc": "X.509 certificate parsing vulnerability"},
+              "pyyaml": {"below": "6.0", "cve": "CVE-2020-14343", "severity": "CRITICAL", "desc": "Arbitrary code execution via yaml.load()"},
+              "jinja2": {"below": "3.1.3", "cve": "CVE-2024-22195", "severity": "MEDIUM", "desc": "XSS via xmlattr filter"},
+              "werkzeug": {"below": "3.0.0", "cve": "CVE-2023-46136", "severity": "HIGH", "desc": "DoS via multipart form parsing"},
+              "sqlalchemy": {"below": "2.0.0", "cve": "CVE-2022-29155", "severity": "MEDIUM", "desc": "SQL injection in certain queries"},
+              "pillow": {"below": "10.0.0", "cve": "CVE-2023-44271", "severity": "HIGH", "desc": "Buffer overflow in image processing"},
+              "urllib3": {"below": "2.0.7", "cve": "CVE-2023-45803", "severity": "MEDIUM", "desc": "Request body not stripped on redirect"},
+          }
+
+          def parse_version(v):
+              try:
+                  return tuple(int(x) for x in re.split(r'[.\-]', v.strip())[:3])
+              except (ValueError, IndexError):
+                  return (0, 0, 0)
+
+          req_files = []
+          for root, dirs, files in os.walk('.'):
+              if '.git' in root:
+                  continue
+              for f in files:
+                  if f in ('requirements.txt', 'requirements-dev.txt', 'Pipfile'):
+                      req_files.append(os.path.join(root, f))
+
+          if not req_files:
+              print("⚠️  No requirements.txt found — creating sample scan output")
+              report_lines.append("No dependency files found in repository.")
+              report_lines.append("Recommendation: Add requirements.txt with pinned versions.")
+          else:
+              total_deps = 0
+              vuln_count = 0
+              for req_file in req_files:
+                  print(f"\n📄 Scanning: {req_file}")
+                  report_lines.append(f"## File: {req_file}")
+                  report_lines.append("")
+                  with open(req_file) as fh:
+                      for line in fh:
+                          line = line.strip()
+                          if not line or line.startswith('#'):
+                              continue
+                          match = re.match(r'^([a-zA-Z0-9_\-]+)\s*[=<>!~]+\s*([0-9][0-9a-zA-Z.\-]*)', line)
+                          if match:
+                              pkg, ver = match.group(1).lower(), match.group(2)
+                              total_deps += 1
+                              if pkg in KNOWN_VULNS:
+                                  vuln = KNOWN_VULNS[pkg]
+                                  if parse_version(ver) < parse_version(vuln["below"]):
+                                      vuln_count += 1
+                                      msg = f"  🚨 [{vuln['severity']}] {pkg}=={ver} — {vuln['cve']}: {vuln['desc']} (fix: >={vuln['below']})"
+                                      print(msg)
+                                      report_lines.append(f"- **{vuln['severity']}** `{pkg}=={ver}` — {vuln['cve']}: {vuln['desc']}")
+                                  else:
+                                      print(f"  ✅ {pkg}=={ver} — up to date")
+                              else:
+                                  print(f"  ✅ {pkg}=={ver} — no known vulnerabilities")
+                  report_lines.append("")
+
+              report_lines.append("---")
+              report_lines.append(f"Total dependencies scanned: {total_deps}")
+              report_lines.append(f"Vulnerabilities found: {vuln_count}")
+
+          with open("dependency-report.txt", "w") as f:
+              f.write("\n".join(report_lines))
+          print("\n✅ Dependency scan complete")
+          PYEOF
+
+      - name: "📊 Generate Security Report"
+        run: |
+          python3 << 'PYEOF'
+          import datetime
+
+          report = []
+          report.append("# 🔒 Security Scan Report")
+          report.append(f"**Generated:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+          report.append(f"**Repository:** ${{ github.repository }}")
+          report.append(f"**Branch:** ${{ github.ref_name }}")
+          report.append(f"**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})")
+          report.append("")
+          report.append("---")
+          report.append("")
+
+          # Include secrets report
+          report.append("## 🔑 Hardcoded Secrets Scan")
+          try:
+              with open("secrets-report.txt") as f:
+                  report.append(f.read())
+          except FileNotFoundError:
+              report.append("No secrets scan results available.")
+          report.append("")
+
+          # Include dependency report
+          report.append("## 📦 Dependency Vulnerability Scan")
+          try:
+              with open("dependency-report.txt") as f:
+                  report.append(f.read())
+          except FileNotFoundError:
+              report.append("No dependency scan results available.")
+
+          report.append("")
+          report.append("---")
+          report.append("*Report generated by GitHub Actions Security Scan Pipeline*")
+
+          full_report = "\n".join(report)
+          with open("security-report.md", "w") as f:
+              f.write(full_report)
+
+          # Also write to step summary
+          with open("$GITHUB_STEP_SUMMARY", "a") as f:
+              f.write(full_report)
+
+          print("📊 Security report generated: security-report.md")
+          PYEOF
+
+      - name: "📤 Upload Security Report"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: |
+            security-report.md
+            secrets-report.txt
+            dependency-report.txt
+          retention-days: 30
