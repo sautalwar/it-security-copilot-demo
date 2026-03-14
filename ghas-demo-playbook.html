@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GHAS + Custom Security Agent - Live Demo Playbook</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  background: #0d1117; color: #e6edf3; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.6; min-height: 100vh;
+}
+a { color: #58a6ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== HEADER BAR (sticky) ===== */
+.header-bar {
+  position: sticky; top: 0; z-index: 1000;
+  background: #010409; border-bottom: 1px solid #30363d;
+  padding: 0 24px; height: 56px;
+  display: flex; align-items: center; gap: 16px;
+}
+.header-title {
+  font-size: 14px; font-weight: 600; white-space: nowrap;
+  background: linear-gradient(90deg, #3fb950, #bc8cff);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header-progress {
+  font-size: 12px; color: #8b949e; white-space: nowrap;
+  margin-left: 8px;
+}
+.header-spacer { flex: 1; }
+
+/* Progress dots */
+.progress-dots { display: flex; gap: 4px; align-items: center; }
+.progress-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #30363d; cursor: pointer; border: none;
+  transition: all 0.2s;
+}
+.progress-dot:hover { background: #8b949e; transform: scale(1.3); }
+.progress-dot.active { background: #58a6ff; box-shadow: 0 0 6px #58a6ff; }
+.progress-dot.done { background: #3fb950; }
+.progress-dot.part1 { border: 1px solid #3fb95055; }
+.progress-dot.part2 { border: 1px solid #bc8cff55; }
+
+/* Timer */
+.timer-btn {
+  background: #21262d; border: 1px solid #30363d; color: #e6edf3;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer;
+  font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 13px;
+  display: flex; align-items: center; gap: 6px;
+  transition: border-color 0.2s;
+}
+.timer-btn:hover { border-color: #58a6ff; }
+.timer-btn.running { border-color: #3fb950; color: #3fb950; }
+
+/* Notes toggle */
+.notes-toggle {
+  background: #21262d; border: 1px solid #30363d; color: #bc8cff;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 14px;
+  transition: all 0.2s;
+}
+.notes-toggle:hover { border-color: #bc8cff; background: #1c1236; }
+.notes-toggle.on { background: #1c1236; border-color: #bc8cff; }
+
+/* Part tabs */
+.part-tabs { display: flex; gap: 2px; }
+.part-tab {
+  background: #21262d; border: 1px solid #30363d; color: #8b949e;
+  padding: 4px 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+  transition: all 0.2s; border-radius: 6px;
+}
+.part-tab:hover { color: #e6edf3; }
+.part-tab.active-ghas { background: #0f2d1a; border-color: #3fb950; color: #3fb950; }
+.part-tab.active-agent { background: #1c1236; border-color: #bc8cff; color: #bc8cff; }
+
+/* ===== MAIN CONTENT ===== */
+.main-content { max-width: 960px; margin: 0 auto; padding: 32px 24px 120px; }
+
+/* ===== SCENE CARDS ===== */
+.scene {
+  background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+  margin-bottom: 32px; overflow: hidden;
+  transition: border-color 0.3s;
+}
+.scene:hover { border-color: #484f58; }
+.scene.ghas-scene:hover { border-color: #3fb95066; }
+.scene.agent-scene:hover { border-color: #bc8cff66; }
+
+/* Scene header */
+.scene-header {
+  padding: 20px 24px; display: flex; align-items: center; gap: 16px;
+  border-bottom: 1px solid #30363d; cursor: pointer;
+  user-select: none;
+}
+.scene-number {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
+.ghas-scene .scene-number { background: #0f2d1a; color: #3fb950; border: 2px solid #3fb950; }
+.agent-scene .scene-number { background: #1c1236; color: #bc8cff; border: 2px solid #bc8cff; }
+.scene-title-block { flex: 1; }
+.scene-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+  margin-bottom: 2px;
+}
+.ghas-scene .scene-label { color: #3fb950; }
+.agent-scene .scene-label { color: #bc8cff; }
+.scene-title { font-size: 18px; font-weight: 600; color: #e6edf3; }
+.scene-time { font-size: 12px; color: #8b949e; white-space: nowrap; }
+.scene-check {
+  width: 28px; height: 28px; border-radius: 6px; border: 2px solid #30363d;
+  background: transparent; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: transparent;
+  font-size: 16px; transition: all 0.2s; flex-shrink: 0;
+}
+.scene-check:hover { border-color: #3fb950; }
+.scene-check.checked {
+  background: #0f2d1a; border-color: #3fb950; color: #3fb950;
+}
+
+/* Scene body */
+.scene-body { padding: 24px; }
+
+/* Story text */
+.story-text {
+  font-size: 16px; font-style: italic; color: #8b949e;
+  border-left: 3px solid #30363d; padding: 12px 16px;
+  margin-bottom: 20px; background: #0d111766;
+}
+
+/* Demo steps */
+.demo-steps { margin-bottom: 20px; }
+.demo-steps h4 {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: #8b949e; margin-bottom: 12px;
+}
+.demo-steps ol { padding-left: 24px; }
+.demo-steps li {
+  margin-bottom: 10px; color: #e6edf3; font-size: 14px; line-height: 1.7;
+}
+.demo-steps li strong { color: #e6edf3; }
+
+/* Terminal blocks */
+.terminal {
+  background: #0a0a0a; border: 1px solid #30363d; border-radius: 8px;
+  margin: 12px 0; overflow: hidden; font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+.terminal-header {
+  background: #161b22; padding: 6px 12px;
+  display: flex; align-items: center; gap: 6px;
+  border-bottom: 1px solid #30363d;
+}
+.terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+.terminal-dot.r { background: #f85149; }
+.terminal-dot.y { background: #d29922; }
+.terminal-dot.g { background: #3fb950; }
+.terminal-header-title { font-size: 11px; color: #8b949e; margin-left: 8px; flex: 1; }
+.copy-btn {
+  background: #21262d; border: 1px solid #30363d; color: #8b949e;
+  padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
+  font-family: system-ui, sans-serif; transition: all 0.2s;
+}
+.copy-btn:hover { color: #e6edf3; border-color: #58a6ff; }
+.copy-btn.copied { color: #3fb950; border-color: #3fb950; }
+.terminal-body { padding: 12px 16px; font-size: 13px; line-height: 1.6; }
+.terminal-body .prompt { color: #3fb950; }
+.terminal-body .cmd { color: #e6edf3; }
+.terminal-body .output { color: #8b949e; }
+.terminal-body .error { color: #f85149; }
+.terminal-body .warn { color: #d29922; }
+.terminal-body .success { color: #3fb950; }
+
+/* Presenter Notes */
+.presenter-notes {
+  display: none; margin-top: 20px; padding: 16px 20px;
+  background: #1c1236; border-left: 3px solid #bc8cff;
+  border-radius: 0 8px 8px 0; font-size: 14px; color: #d2a8ff;
+  line-height: 1.7;
+}
+.presenter-notes .notes-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; color: #bc8cff; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+body.show-notes .presenter-notes { display: block; }
+
+/* Callout boxes */
+.callout {
+  padding: 16px 20px; border-radius: 8px; margin: 16px 0;
+  font-size: 14px; font-weight: 500;
+}
+.callout-green { background: #0f2d1a; border: 1px solid #3fb95044; color: #3fb950; }
+.callout-purple { background: #1c1236; border: 1px solid #bc8cff44; color: #d2a8ff; }
+.callout-red { background: #2d0f0f; border: 1px solid #f8514944; color: #f85149; }
+.callout-yellow { background: #2d2200; border: 1px solid #d2992244; color: #d29922; }
+.callout-blue { background: #0d1d33; border: 1px solid #58a6ff44; color: #58a6ff; }
+.callout strong { color: inherit; }
+.callout .callout-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 6px; opacity: 0.8;
+}
+
+/* Key message box */
+.key-message {
+  text-align: center; font-size: 20px; font-weight: 700;
+  padding: 24px; margin: 20px 0; border-radius: 8px;
+}
+.key-message.ghas { background: #0f2d1a; border: 2px solid #3fb950; color: #3fb950; }
+.key-message.agent { background: #1c1236; border: 2px solid #bc8cff; color: #bc8cff; }
+
+/* OWASP badges */
+.owasp-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px; margin: 12px 0;
+}
+.owasp-badge {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; background: #0f2d1a; border-radius: 6px;
+  font-size: 12px; font-weight: 600; color: #3fb950;
+  border: 1px solid #3fb95033;
+}
+.owasp-badge .check-icon { font-size: 14px; }
+
+/* Gap list */
+.gap-list { list-style: none; padding: 0; }
+.gap-list li {
+  padding: 8px 12px; margin: 4px 0; background: #2d0f0f;
+  border-radius: 6px; font-size: 14px; color: #f85149;
+  border-left: 3px solid #f85149;
+}
+
+/* Pro tip */
+.pro-tip {
+  background: #0d1d33; border: 1px solid #58a6ff44;
+  border-radius: 8px; padding: 12px 16px; margin: 12px 0;
+  font-size: 13px; color: #79c0ff;
+}
+.pro-tip::before { content: "Pro tip: "; font-weight: 700; }
+
+/* ===== INTRO / TRANSITION / CLOSING CARDS ===== */
+.cinematic-card {
+  background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+  border: 1px solid #30363d; border-radius: 16px;
+  padding: 48px 40px; margin-bottom: 32px;
+  text-align: center; position: relative; overflow: hidden;
+}
+.cinematic-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3fb950, #58a6ff, #bc8cff);
+}
+.cinematic-card h2 {
+  font-size: 28px; font-weight: 700; margin-bottom: 16px; color: #e6edf3;
+}
+.cinematic-card .subtitle {
+  font-size: 14px; color: #8b949e; max-width: 700px; margin: 0 auto 24px;
+  line-height: 1.8;
+}
+.cinematic-card .drama-text {
+  font-size: 18px; line-height: 1.8; color: #c9d1d9;
+  max-width: 680px; margin: 0 auto; text-align: left;
+}
+.cinematic-card .drama-text em { color: #d29922; font-style: normal; font-weight: 600; }
+
+/* Part divider */
+.part-divider {
+  text-align: center; padding: 40px 24px; margin: 48px 0;
+  position: relative;
+}
+.part-divider::before {
+  content: ''; position: absolute; top: 50%; left: 0; right: 0;
+  height: 1px; background: #30363d;
+}
+.part-divider h2 {
+  display: inline-block; background: #0d1117; padding: 0 24px;
+  position: relative; font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 3px;
+}
+.part-divider.ghas h2 { color: #3fb950; }
+.part-divider.agent h2 { color: #bc8cff; }
+
+/* Transition card */
+.transition-card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+  padding: 32px; margin: 32px 0;
+}
+.transition-card h3 { font-size: 20px; margin-bottom: 16px; color: #e6edf3; }
+.transition-card .check-list { list-style: none; padding: 0; margin: 12px 0; }
+.transition-card .check-list li {
+  padding: 6px 0; font-size: 15px; color: #3fb950;
+}
+.transition-card .pivot-text {
+  margin-top: 20px; padding-top: 20px;
+  border-top: 1px solid #30363d; font-size: 16px;
+  color: #d29922; font-weight: 600; line-height: 1.8;
+}
+
+/* Closing card */
+.closing-card {
+  background: linear-gradient(135deg, #0f2d1a 0%, #1c1236 100%);
+  border: 1px solid #30363d; border-radius: 16px;
+  padding: 40px; margin: 32px 0;
+}
+.closing-card h3 { font-size: 22px; margin-bottom: 24px; text-align: center; }
+.closing-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.closing-col h4 {
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 12px;
+}
+.closing-col.ghas-col h4 { color: #3fb950; }
+.closing-col.agent-col h4 { color: #bc8cff; }
+.closing-col ul { list-style: none; padding: 0; }
+.closing-col li { padding: 5px 0; font-size: 14px; color: #c9d1d9; }
+
+.cta-card {
+  background: #161b22; border: 2px solid #58a6ff; border-radius: 12px;
+  padding: 32px; margin: 32px 0; text-align: center;
+}
+.cta-card h3 { font-size: 20px; color: #58a6ff; margin-bottom: 16px; }
+.cta-card ol { text-align: left; max-width: 480px; margin: 0 auto; padding-left: 24px; }
+.cta-card li { padding: 6px 0; font-size: 15px; color: #c9d1d9; }
+.cta-card .cta-final {
+  margin-top: 20px; font-size: 18px; font-weight: 700;
+  color: #3fb950;
+}
+
+/* Architecture diagram */
+.arch-diagram {
+  background: #0a0a0a; border: 1px solid #30363d; border-radius: 8px;
+  padding: 24px; margin: 16px 0; text-align: center;
+}
+.arch-flow {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; flex-wrap: wrap;
+}
+.arch-box {
+  padding: 12px 20px; border-radius: 8px; font-size: 13px;
+  font-weight: 600; text-align: center; min-width: 120px;
+}
+.arch-box.prompt { background: #0d1d33; border: 1px solid #58a6ff; color: #58a6ff; }
+.arch-box.agent { background: #1c1236; border: 1px solid #bc8cff; color: #bc8cff; }
+.arch-box.action { background: #0f2d1a; border: 1px solid #3fb950; color: #3fb950; }
+.arch-arrow { color: #30363d; font-size: 20px; }
+
+/* Keyboard hint */
+.keyboard-hints {
+  position: fixed; bottom: 16px; right: 16px; z-index: 999;
+  background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+  padding: 8px 12px; font-size: 11px; color: #8b949e;
+  display: flex; gap: 12px;
+}
+.kbd {
+  display: inline-block; background: #0d1117; border: 1px solid #30363d;
+  border-radius: 3px; padding: 1px 5px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 10px; color: #e6edf3;
+}
+
+/* Timeline bar */
+.timeline-bar {
+  display: flex; align-items: stretch; gap: 0;
+  margin: 24px 0 32px; border-radius: 8px; overflow: hidden;
+  border: 1px solid #30363d;
+}
+.timeline-segment {
+  flex: 1; padding: 10px 8px; text-align: center; font-size: 11px;
+  font-weight: 600; position: relative; cursor: pointer;
+  transition: filter 0.2s;
+}
+.timeline-segment:hover { filter: brightness(1.3); }
+.timeline-segment .tl-time {
+  display: block; font-size: 10px; opacity: 0.7; margin-top: 2px;
+  font-weight: 400;
+}
+.timeline-segment.tl-ghas { background: #0f2d1a; color: #3fb950; }
+.timeline-segment.tl-agent { background: #1c1236; color: #bc8cff; }
+.timeline-segment.tl-alert { background: #2d0f0f; color: #f85149; }
+
+/* Scene expand/collapse animation */
+.scene-body {
+  max-height: 8000px; overflow: hidden;
+  transition: max-height 0.4s ease-in-out;
+}
+
+/* Talking point badges */
+.talking-point {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #21262d; border: 1px solid #30363d; border-radius: 20px;
+  padding: 4px 12px; font-size: 12px; font-weight: 600;
+  color: #8b949e; margin: 4px 4px 4px 0;
+}
+.talking-point.tp-ghas { border-color: #3fb95055; color: #3fb950; }
+.talking-point.tp-agent { border-color: #bc8cff55; color: #bc8cff; }
+.talking-point.tp-danger { border-color: #f8514955; color: #f85149; }
+
+/* Stat counter */
+.stat-row {
+  display: flex; gap: 16px; margin: 16px 0; flex-wrap: wrap;
+}
+.stat-card {
+  flex: 1; min-width: 140px; background: #0d1117;
+  border: 1px solid #30363d; border-radius: 8px;
+  padding: 16px; text-align: center;
+}
+.stat-card .stat-value {
+  font-size: 28px; font-weight: 700; line-height: 1.2;
+}
+.stat-card .stat-label {
+  font-size: 11px; color: #8b949e; text-transform: uppercase;
+  letter-spacing: 1px; margin-top: 4px;
+}
+.stat-card.stat-green .stat-value { color: #3fb950; }
+.stat-card.stat-purple .stat-value { color: #bc8cff; }
+.stat-card.stat-red .stat-value { color: #f85149; }
+.stat-card.stat-yellow .stat-value { color: #d29922; }
+
+/* Comparison table */
+.compare-table {
+  width: 100%; border-collapse: collapse; margin: 16px 0;
+  font-size: 13px;
+}
+.compare-table th {
+  text-align: left; padding: 10px 12px;
+  background: #0d1117; border-bottom: 2px solid #30363d;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: #8b949e;
+}
+.compare-table td {
+  padding: 10px 12px; border-bottom: 1px solid #21262d;
+  color: #c9d1d9;
+}
+.compare-table tr:hover td { background: #161b2266; }
+.compare-table .badge-yes {
+  display: inline-block; background: #0f2d1a; color: #3fb950;
+  padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;
+}
+.compare-table .badge-no {
+  display: inline-block; background: #2d0f0f; color: #f85149;
+  padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;
+}
+
+/* Before/after split */
+.before-after {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0;
+}
+.ba-panel {
+  background: #0a0a0a; border-radius: 8px; padding: 16px; overflow: auto;
+  font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 12px;
+  line-height: 1.6;
+}
+.ba-panel .ba-label {
+  font-family: system-ui, sans-serif; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+  display: block;
+}
+.ba-panel.ba-before { border: 1px solid #f8514944; }
+.ba-panel.ba-before .ba-label { color: #f85149; }
+.ba-panel.ba-after { border: 1px solid #3fb95044; }
+.ba-panel.ba-after .ba-label { color: #3fb950; }
+
+/* Mitre ATT&CK badges */
+.mitre-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0;
+}
+.mitre-badge {
+  background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+  padding: 6px 12px; font-size: 12px; color: #d29922; font-weight: 600;
+}
+
+/* Print styles */
+@media print {
+  .header-bar, .keyboard-hints { display: none; }
+  body { background: white; color: #1a1a1a; }
+  .scene { break-inside: avoid; border-color: #ccc; }
+  .presenter-notes { display: block !important; border-color: #8b5cf6; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-bar { padding: 0 12px; gap: 8px; }
+  .header-title { font-size: 12px; }
+  .progress-dots { display: none; }
+  .main-content { padding: 16px 12px 80px; }
+  .cinematic-card { padding: 32px 20px; }
+  .closing-columns { grid-template-columns: 1fr; }
+  .keyboard-hints { display: none; }
+  .scene-body { padding: 16px; }
+  .part-tabs { display: none; }
+  .before-after { grid-template-columns: 1fr; }
+  .timeline-bar { flex-wrap: wrap; }
+  .stat-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER BAR ===== -->
+<header class="header-bar" role="banner">
+  <div class="header-title">GHAS + Custom Security Agent &mdash; Live Demo Playbook</div>
+  <div class="header-progress" id="progressText">Scene 0 of 15</div>
+  <div class="progress-dots" id="progressDots"></div>
+  <div class="header-spacer"></div>
+  <div class="part-tabs">
+    <button class="part-tab" id="tabGhas" onclick="scrollToPart('part1')">Part 1: GHAS</button>
+    <button class="part-tab" id="tabAgent" onclick="scrollToPart('part2')">Part 2: Custom Agent</button>
+  </div>
+  <button class="timer-btn" id="timerBtn" onclick="toggleTimer()" title="Start/stop timer (T)">
+    <span>&#9201;</span> <span id="timerDisplay">00:00</span>
+  </button>
+  <button class="notes-toggle" id="notesBtn" onclick="toggleNotes()" title="Toggle presenter notes (N)">&#127908; Notes</button>
+</header>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="main-content">
+
+<!-- ===== OPENING SLIDE ===== -->
+<section class="cinematic-card" id="scene-intro">
+  <h2>The Contoso Breach</h2>
+  <div class="subtitle">From Alert to Resolution in One Day</div>
+  <div class="drama-text">
+    It's <em>Monday, 8:00 AM</em>. Contoso Financial's SOC dashboard lights up. Something is wrong.<br><br>
+    Over the next <em>8 hours</em>, you'll see how GitHub transforms security response &mdash;
+    from detecting a DNS exfiltration attack, to finding exposed secrets in code,
+    to hardening infrastructure, to generating the board report.<br><br>
+    <em>Two tools. Complete coverage.</em>
+  </div>
+  <div class="presenter-notes">
+    <div class="notes-label">&#127908; Presenter Notes</div>
+    Set the scene. This is a story about a real incident (simulated). Everything I'm about to show you
+    runs in real-time on GitHub. Part 1 shows what you get for free with GHAS. Part 2 shows how a custom
+    agent fills every remaining gap. Contoso Financial Corp has 500 developers, 12 microservices, Azure
+    infrastructure. Their CISO Sarah Chen gets an alert: anomalous DNS traffic detected.
+  </div>
+</section>
+
+<!-- ===== TIMELINE BAR ===== -->
+<nav class="timeline-bar" aria-label="Incident timeline">
+  <div class="timeline-segment tl-alert" onclick="jumpToScene(9)" title="8:00 AM - Alert">
+    &#9888; Alert<span class="tl-time">8:00 AM</span>
+  </div>
+  <div class="timeline-segment tl-ghas" onclick="jumpToScene(1)" title="8:30 AM - Enable GHAS">
+    Enable GHAS<span class="tl-time">8:30 AM</span>
+  </div>
+  <div class="timeline-segment tl-ghas" onclick="jumpToScene(2)" title="9:00 AM - Secrets">
+    Secrets<span class="tl-time">9:00 AM</span>
+  </div>
+  <div class="timeline-segment tl-ghas" onclick="jumpToScene(3)" title="9:30 AM - CodeQL">
+    CodeQL<span class="tl-time">9:30 AM</span>
+  </div>
+  <div class="timeline-segment tl-ghas" onclick="jumpToScene(4)" title="10:00 AM - Deps">
+    Supply Chain<span class="tl-time">10:00 AM</span>
+  </div>
+  <div class="timeline-segment tl-agent" onclick="jumpToScene(9)" title="11:00 AM - DNS">
+    DNS Forensics<span class="tl-time">11:00 AM</span>
+  </div>
+  <div class="timeline-segment tl-agent" onclick="jumpToScene(10)" title="1:00 PM - Firewall">
+    Firewall<span class="tl-time">1:00 PM</span>
+  </div>
+  <div class="timeline-segment tl-agent" onclick="jumpToScene(11)" title="2:00 PM - VPN">
+    VPN Audit<span class="tl-time">2:00 PM</span>
+  </div>
+  <div class="timeline-segment tl-agent" onclick="jumpToScene(12)" title="5:00 PM - Report">
+    Report<span class="tl-time">5:00 PM</span>
+  </div>
+</nav>
+
+<!-- ===== CONTOSO CONTEXT CARD ===== -->
+<section class="scene" style="border-color:#58a6ff33;margin-bottom:32px;">
+  <div class="scene-body">
+    <div style="text-align:center;margin-bottom:16px;">
+      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#58a6ff;">Customer Profile</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card stat-green">
+        <div class="stat-value">500</div>
+        <div class="stat-label">Developers</div>
+      </div>
+      <div class="stat-card stat-purple">
+        <div class="stat-value">12</div>
+        <div class="stat-label">Microservices</div>
+      </div>
+      <div class="stat-card stat-yellow">
+        <div class="stat-value">Azure</div>
+        <div class="stat-label">Cloud Platform</div>
+      </div>
+      <div class="stat-card stat-red">
+        <div class="stat-value">SOC 2</div>
+        <div class="stat-label">Compliance Req.</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:13px;color:#8b949e;">
+      Contoso Financial Corp &mdash; CISO: Sarah Chen &mdash; Regulated financial services &mdash; Multi-cloud with Azure primary
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!--  PART 1: GITHUB ADVANCED SECURITY                            -->
+<!-- ============================================================ -->
+<div class="part-divider ghas" id="part1">
+  <h2>Part 1 &mdash; GitHub Advanced Security</h2>
+</div>
+
+<!-- ===== SCENE 1: Enable GHAS ===== -->
+<section class="scene ghas-scene" id="scene-1" data-scene="1">
+  <div class="scene-header" onclick="jumpToScene(1)">
+    <div class="scene-number">1</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 1 &bull; GHAS</div>
+      <div class="scene-title">Enable GHAS</div>
+    </div>
+    <div class="scene-time">~2 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,1)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "Before the incident even happens, Contoso had enabled GHAS on their repos. Let me show you what that looks like."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Open browser &rarr; Navigate to <code>github.com/sautalwar/it-security-copilot-demo</code></li>
+        <li>Click <strong>Settings</strong> tab (gear icon, top right of repo)</li>
+        <li>Click <strong>Code security</strong> in the left sidebar (under "Security")</li>
+        <li>Point out the security features panel:
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li><strong>Dependency graph</strong> &rarr; Show it's &#9989; Enabled</li>
+            <li><strong>Dependabot alerts</strong> &rarr; Click <strong>Enable</strong> if not already on</li>
+            <li><strong>Dependabot security updates</strong> &rarr; Click <strong>Enable</strong></li>
+            <li><strong>Code scanning</strong> &rarr; Click <strong>Set up</strong> &rarr; Select <strong>Default setup</strong> &rarr; Click <strong>Enable CodeQL</strong></li>
+            <li><strong>Secret scanning</strong> &rarr; Click <strong>Enable</strong></li>
+            <li><strong>Push protection</strong> &rarr; Click <strong>Enable</strong></li>
+          </ul>
+        </li>
+        <li>"That's it. Five clicks. You now have world-class code security."</li>
+      </ol>
+    </div>
+
+    <div class="key-message ghas">5 clicks. 2 minutes. World-class security enabled.</div>
+
+    <div style="margin-top:16px;">
+      <span class="talking-point tp-ghas">&#128274; 200+ secret patterns</span>
+      <span class="talking-point tp-ghas">&#128269; Semantic code analysis</span>
+      <span class="talking-point tp-ghas">&#128230; Supply chain monitoring</span>
+      <span class="talking-point tp-ghas">&#128736; Zero config defaults</span>
+    </div>
+
+    <div class="callout callout-blue" style="margin-top:16px;">
+      <div class="callout-title">Competitive Differentiator</div>
+      Unlike bolt-on security tools that require weeks of configuration, GHAS is native to the developer workflow.
+      No context switching. No separate dashboards. No agent installations on developer machines.
+      Security findings appear exactly where developers already work &mdash; in the pull request.
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      This is the "aha" moment for many customers. They think security tooling takes weeks to set up.
+      GHAS takes 2 minutes. And it's not just checkboxes &mdash; each of these is a sophisticated engine.
+      CodeQL understands your code semantically &mdash; it's not grep, it's a query language that models data flow.
+      Secret scanning has 200+ patterns from providers like AWS, Azure, Slack, Stripe.
+      Push protection is the only tool that blocks secrets BEFORE they enter the repo.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 2: Secret Scanning ===== -->
+<section class="scene ghas-scene" id="scene-2" data-scene="2">
+  <div class="scene-header" onclick="jumpToScene(2)">
+    <div class="scene-number">2</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 1 &bull; GHAS</div>
+      <div class="scene-title">Secret Scanning in Action</div>
+    </div>
+    <div class="scene-time">~3 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,2)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "During the investigation, the team discovers developers had been hardcoding secrets. But GHAS was already watching."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Open VS Code terminal (or any terminal)</li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'cd it-security-copilot-demo')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">cd it-security-copilot-demo</span></div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/05-secret-exposure/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/05-secret-exposure/simulate.py</span><br>
+              <span class="output">Created vulnerable config.py with hardcoded secrets</span>
+            </div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'git add -A && git commit -m &quot;add config files&quot;')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">git add -A && git commit -m "add config files"</span></div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'git push origin main')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">git push origin main</span></div>
+          </div>
+        </li>
+        <li>
+          <strong style="color:#f85149;font-size:16px;">THE PUSH GETS BLOCKED! &#128683;</strong>
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal &mdash; Push Rejected</span>
+            </div>
+            <div class="terminal-body">
+              <span class="error">remote: error: GH013: Repository rule violations found</span><br>
+              <span class="error">remote: Push cannot contain secrets</span><br>
+              <span class="warn">remote: -- Slack Incoming Webhook URL</span><br>
+              <span class="warn">remote: -- Stripe API Key</span>
+            </div>
+          </div>
+        </li>
+        <li>Point to the terminal output: "This is Push Protection. The secret never entered the repo."</li>
+        <li>Navigate to <strong>GitHub &rarr; Security tab &rarr; Secret scanning</strong>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Show any existing alerts</li>
+            <li>Click on an alert &rarr; show detail page (secret type, location, remediation guidance)</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <div class="pro-tip">
+      We ACTUALLY got blocked by Push Protection when building this demo &mdash; this is real, not simulated!
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      This is the demo moment that sells GHAS. The push literally gets rejected. I'm going to try to push
+      code with a Slack webhook URL and a Stripe API key &mdash; watch what happens. [push] See? Blocked.
+      The secret never touched the repo. No cleanup needed, no rotation panic, no breach disclosure.
+      This is the difference between "we detected a secret" and "we prevented a secret from ever leaking."
+      Every other tool detects after the fact. Push Protection prevents.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 3: Code Scanning with CodeQL ===== -->
+<section class="scene ghas-scene" id="scene-3" data-scene="3">
+  <div class="scene-header" onclick="jumpToScene(3)">
+    <div class="scene-number">3</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 1 &bull; GHAS</div>
+      <div class="scene-title">Code Scanning with CodeQL</div>
+    </div>
+    <div class="scene-time">~5 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,3)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "The team also needs to check their application code for vulnerabilities. CodeQL is already running."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/11-vulnerability-fix/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/11-vulnerability-fix/simulate.py</span><br>
+              <span class="output">Created vulnerable webapp with SQL injection, XSS, command injection...</span>
+            </div>
+          </div>
+        </li>
+        <li>Open <code>vulnerable-app/webapp/app.py</code> in VS Code</li>
+        <li>Point out the vulnerabilities <strong>with Copilot</strong>:
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Select the SQL query line: <code>f"SELECT * FROM users WHERE id = {user_input}"</code></li>
+            <li>Open Copilot Chat &rarr; Type: <em>"Is this code secure? What vulnerabilities do you see?"</em></li>
+            <li>Show Copilot identifying SQL injection, XSS, command injection, path traversal</li>
+          </ul>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'git add -A && git commit -m &quot;add webapp&quot; && git push origin main')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">git add -A && git commit -m "add webapp" && git push origin main</span></div>
+          </div>
+        </li>
+        <li>Navigate to <strong>GitHub &rarr; Security tab &rarr; Code scanning</strong>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Wait for CodeQL analysis to complete (or show a pre-existing scan)</li>
+            <li>Show alerts: SQL injection (Critical), XSS (High), Command injection (Critical)</li>
+            <li>Click on an alert &rarr; show the exact line of code, data flow (source &rarr; sink), severity and CWE reference</li>
+          </ul>
+        </li>
+        <li>Show <strong>Copilot Autofix</strong>:
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>On a code scanning alert, show the "Autofix" suggestion</li>
+            <li>Copilot generates the parameterized query fix</li>
+            <li>"One click to generate the fix. One click to create a PR."</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <div class="callout callout-green">
+      <div class="callout-title">OWASP Top 10 Coverage</div>
+      <div class="owasp-grid">
+        <div class="owasp-badge"><span class="check-icon">&#9989;</span> A01: Broken Access Control</div>
+        <div class="owasp-badge"><span class="check-icon">&#9989;</span> A03: Injection</div>
+        <div class="owasp-badge"><span class="check-icon">&#9989;</span> A07: Auth Failures</div>
+        <div class="owasp-badge"><span class="check-icon">&#9989;</span> A08: Software Integrity</div>
+        <div class="owasp-badge"><span class="check-icon">&#9989;</span> A10: SSRF</div>
+      </div>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      CodeQL is not just pattern matching &mdash; it understands data flow. It traces the user input from the HTTP
+      request parameter through variable assignments, function calls, and conditionally &mdash; all the way to the
+      dangerous sink like a SQL query. That's why it catches things that simple regex scanners miss.
+      And with Copilot Autofix, it doesn't just tell you there's a problem &mdash; it writes the fix.
+      The developer reviews and merges. Secure code, minimal friction.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 4: Dependabot & Supply Chain ===== -->
+<section class="scene ghas-scene" id="scene-4" data-scene="4">
+  <div class="scene-header" onclick="jumpToScene(4)">
+    <div class="scene-number">4</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 1 &bull; GHAS</div>
+      <div class="scene-title">Dependabot &amp; Supply Chain</div>
+    </div>
+    <div class="scene-time">~3 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,4)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "The vulnerable app also has outdated dependencies with known CVEs."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Open <code>vulnerable-app/webapp/requirements.txt</code> in VS Code
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Point out old versions: <code>flask==1.0.0</code>, <code>pyyaml==3.12</code>, <code>urllib3==1.24.1</code></li>
+          </ul>
+        </li>
+        <li>Navigate to <strong>GitHub &rarr; Security tab &rarr; Dependabot alerts</strong>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Show CVE alerts for each vulnerable package</li>
+            <li>Click on a CVE &rarr; show severity, description, affected versions, fixed version</li>
+          </ul>
+        </li>
+        <li>Navigate to <strong>Pull requests tab</strong>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Show Dependabot auto-generated PRs updating each dependency</li>
+            <li>Open a PR &rarr; show the version bump, changelog, compatibility notes</li>
+          </ul>
+        </li>
+        <li>Show <strong>Dependency graph</strong> (Insights &rarr; Dependency graph)
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Visualize the full dependency tree</li>
+            <li>"You can see every package your app depends on, and whether it has known vulnerabilities"</li>
+          </ul>
+        </li>
+        <li>Show <strong>SBOM export</strong> if available &mdash;
+          "For compliance teams that need a Software Bill of Materials"
+        </li>
+      </ol>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      Supply chain attacks are the #1 growing threat vector. SolarWinds, Log4Shell, the XZ Utils backdoor &mdash;
+      all supply chain. Dependabot monitors every dependency in your repo against the GitHub Advisory Database &mdash;
+      the world's largest vulnerability database. When a CVE drops, you get an alert within minutes and an
+      auto-generated PR to update. No human intervention needed for the routine stuff.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 5: Security Overview Dashboard ===== -->
+<section class="scene ghas-scene" id="scene-5" data-scene="5">
+  <div class="scene-header" onclick="jumpToScene(5)">
+    <div class="scene-number">5</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 1 &bull; GHAS</div>
+      <div class="scene-title">Security Overview Dashboard</div>
+    </div>
+    <div class="scene-time">~2 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,5)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "Sarah wants to see the big picture across all repos."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Navigate to <strong>GitHub &rarr; Organization level &rarr; Security tab</strong> (or repo-level Security tab)</li>
+        <li>Show <strong>Security Overview</strong>:
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Code scanning alerts by severity</li>
+            <li>Secret scanning alerts</li>
+            <li>Dependabot alerts</li>
+            <li>Coverage metrics (which repos have GHAS enabled)</li>
+          </ul>
+        </li>
+        <li>"This is the CISO's view &mdash; one dashboard for all repos, all teams, all findings."</li>
+      </ol>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      This is where you sell to the CISO. They don't want to log into 15 different tools.
+      Security Overview gives them one pane of glass across every repo in the org.
+      They can filter by team, severity, tool type. They can see which repos have GHAS enabled
+      and which don't. They can track trends over time. This is the cockpit.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 6: GHAS Summary Transition ===== -->
+<section class="scene ghas-scene" id="scene-6" data-scene="6">
+  <div class="scene-header" onclick="jumpToScene(6)">
+    <div class="scene-number">6</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 1 &bull; GHAS</div>
+      <div class="scene-title">GHAS Summary &amp; Pivot</div>
+    </div>
+    <div class="scene-time">~1 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,6)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="transition-card">
+      <h3>In 15 minutes, we enabled and demonstrated:</h3>
+      <ul class="check-list">
+        <li>&#9989; Secret Scanning + Push Protection &mdash; secrets blocked before they enter the repo</li>
+        <li>&#9989; Code Scanning (CodeQL) &mdash; SQL injection, XSS, command injection detected and auto-fixed</li>
+        <li>&#9989; Dependabot &mdash; CVEs in dependencies detected, PRs auto-generated</li>
+        <li>&#9989; Security Overview &mdash; single pane of glass for the CISO</li>
+      </ul>
+      <div class="pivot-text">
+        <strong>But...</strong> what about the DNS exfiltration alert that started this whole incident?<br>
+        What about the firewall rules? The VPN with weak crypto? The compliance report for the board?<br><br>
+        GHAS is brilliant at code. But security doesn't stop at the code editor.<br><br>
+        <strong>Let's go deeper.</strong>
+      </div>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      This is the pivot. You've shown them amazing value with GHAS. Now you create the "but wait,
+      there's more" moment. The customer is thinking "this is great for our devs, but what about
+      our network team? Our compliance team? Our SOC?" That's exactly where you're going next.
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!--  PART 2: CUSTOM SECURITY AGENT                               -->
+<!-- ============================================================ -->
+<div class="part-divider agent" id="part2">
+  <h2>Part 2 &mdash; Custom Security Agent</h2>
+</div>
+
+<!-- ===== SCENE 7: The Gap ===== -->
+<section class="scene agent-scene" id="scene-7" data-scene="7">
+  <div class="scene-header" onclick="jumpToScene(7)">
+    <div class="scene-number">7</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 2 &bull; Custom Agent</div>
+      <div class="scene-title">The Gap</div>
+    </div>
+    <div class="scene-time">~2 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,7)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "Remember the DNS alert from 8:00 AM? GHAS couldn't see it. It's a network-level threat."
+    </div>
+
+    <div class="callout callout-red">
+      <div class="callout-title">What GHAS Cannot Do</div>
+      <ul class="gap-list">
+        <li>&#10060; Monitor DNS traffic for tunneling / exfiltration</li>
+        <li>&#10060; Audit firewall rules for misconfigurations</li>
+        <li>&#10060; Scan VPN configs for weak cryptography</li>
+        <li>&#10060; Check WAF OWASP CRS enablement</li>
+        <li>&#10060; Monitor CIS / NIST / PCI-DSS compliance for network infrastructure</li>
+        <li>&#10060; Perform network forensics and IOC extraction</li>
+        <li>&#10060; Generate executive incident reports</li>
+        <li>&#10060; Enforce OPA / Rego policies on infrastructure deployments</li>
+      </ul>
+    </div>
+
+    <p style="font-size:15px;color:#d29922;font-weight:600;margin-top:16px;line-height:1.7;">
+      These aren't code problems. These are network, infrastructure, and operational security problems.
+      We need a custom agent.
+    </p>
+
+    <table class="compare-table" style="margin-top:20px;">
+      <thead>
+        <tr>
+          <th>Security Capability</th>
+          <th>GHAS</th>
+          <th>Custom Agent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Secret scanning &amp; push protection</td>
+          <td><span class="badge-yes">Yes</span></td>
+          <td><span class="badge-no">N/A</span></td>
+        </tr>
+        <tr>
+          <td>Static code analysis (SAST)</td>
+          <td><span class="badge-yes">Yes</span></td>
+          <td><span class="badge-no">N/A</span></td>
+        </tr>
+        <tr>
+          <td>Dependency vulnerability scanning</td>
+          <td><span class="badge-yes">Yes</span></td>
+          <td><span class="badge-no">N/A</span></td>
+        </tr>
+        <tr>
+          <td>DNS traffic analysis</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+        <tr>
+          <td>Firewall rule auditing</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+        <tr>
+          <td>VPN crypto assessment</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+        <tr>
+          <td>IaC CIS benchmark compliance</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+        <tr>
+          <td>CIS / NIST / PCI-DSS scoring</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+        <tr>
+          <td>Executive incident reporting</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+        <tr>
+          <td>MITRE ATT&amp;CK mapping</td>
+          <td><span class="badge-no">No</span></td>
+          <td><span class="badge-yes">Yes</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      Don't trash GHAS here &mdash; frame it as "GHAS does its job brilliantly, and we need another tool for a
+      different job." Like having a great alarm system (GHAS) and also needing a security patrol (custom agent).
+      Both are essential, they cover different ground.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 8: Architecture ===== -->
+<section class="scene agent-scene" id="scene-8" data-scene="8">
+  <div class="scene-header" onclick="jumpToScene(8)">
+    <div class="scene-number">8</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 2 &bull; Custom Agent</div>
+      <div class="scene-title">The Custom Agent Architecture</div>
+    </div>
+    <div class="scene-time">~3 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,8)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "Let me show you how the custom agent works."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Open VS Code &rarr; Navigate to <code>.github/workflows/</code>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Show the workflow YAML files</li>
+            <li>Point out: "These are the agent's muscles &mdash; each workflow is a security check"</li>
+          </ul>
+        </li>
+        <li>Open <code>scenarios/</code> folder structure
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Show the 12 scenario folders</li>
+            <li>"Each scenario has a simulate (create the problem) and remediate (fix it) script"</li>
+          </ul>
+        </li>
+        <li>Explain the concept:
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>"The agent runs on a schedule &mdash; every 6 hours, or on every push"</li>
+            <li>"It reads prompt files that contain security rules"</li>
+            <li>"It evaluates your infrastructure against those rules"</li>
+            <li>"It creates issues and PRs for anything it finds"</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <div class="arch-diagram">
+      <div style="font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;font-weight:700;">
+        Agent Architecture
+      </div>
+      <div class="arch-flow">
+        <div class="arch-box prompt">Prompt Files<br><small style="opacity:0.7">(Security Rules in Markdown)</small></div>
+        <div class="arch-arrow">&#10132;</div>
+        <div class="arch-box agent">Custom Agent<br><small style="opacity:0.7">(GitHub Actions + Copilot)</small></div>
+        <div class="arch-arrow">&#10132;</div>
+        <div class="arch-box action">Response Actions<br><small style="opacity:0.7">(Issues, PRs, Reports)</small></div>
+      </div>
+      <div style="margin-top:20px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:#58a6ff;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Triggers</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.8;">
+            Scheduled (every 6h)<br>Push events<br>Manual dispatch<br>PR review requests
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:#bc8cff;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Analysis</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.8;">
+            DNS log parsing<br>Config file auditing<br>Compliance scoring<br>Threat intelligence
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:#3fb950;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Outputs</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.8;">
+            GitHub Issues<br>Auto-fix PRs<br>Security reports<br>Compliance scorecards
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#8b949e;margin-bottom:8px;">
+        12 Security Scenarios
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px;">
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">01 &mdash; DNS Threat Detection</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">02 &mdash; Lateral Movement</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">03 &mdash; Firewall Containment</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">04 &mdash; WAF Configuration</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">05 &mdash; Secret Exposure</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">06 &mdash; IaC Hardening</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">07 &mdash; OPA Policy Enforcement</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">08 &mdash; VPN Audit</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">09 &mdash; Threat Modeling</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">10 &mdash; Network Compliance</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">11 &mdash; Vulnerability Fix</div>
+        <div style="padding:6px 10px;background:#1c1236;border-radius:4px;color:#d2a8ff;">12 &mdash; Incident Report</div>
+      </div>
+    </div>
+
+    <div class="callout callout-purple">
+      <div class="callout-title">Key Selling Point</div>
+      The agent's intelligence comes from prompt files &mdash; markdown documents that describe what to look for.
+      Your security team writes these in plain English. When a new CVE or threat emerges, they update a markdown file.
+      No code changes, no redeployment. Security knowledge as version-controlled documents.
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      The key selling point: the agent's intelligence comes from prompt files &mdash; markdown documents that
+      describe what to look for. Your security team writes these in plain English. When a new CVE or threat
+      emerges, they update a markdown file. No code changes, no redeployment. Security knowledge as
+      version-controlled documents.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 9: DNS Exfiltration ===== -->
+<section class="scene agent-scene" id="scene-9" data-scene="9">
+  <div class="scene-header" onclick="jumpToScene(9)">
+    <div class="scene-number">9</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 2 &bull; Custom Agent</div>
+      <div class="scene-title">DNS Exfiltration &mdash; Live</div>
+    </div>
+    <div class="scene-time">~5 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,9)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "Back to the morning alert. Let's see what the agent finds."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/01-dns-alert/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/01-dns-alert/simulate.py</span><br>
+              <span class="output">255 DNS queries logged, 115 to C2 domain</span>
+            </div>
+          </div>
+        </li>
+        <li>Open <code>vulnerable-app/dns_queries.log</code> in VS Code
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Point out normal queries (google.com, microsoft.com)</li>
+            <li>Point out suspicious queries: <code>dGhpcyBpcyBzZWNyZXQ.evil-c2.example.com</code></li>
+            <li>"See those random-looking subdomains? That's base64-encoded data being exfiltrated via DNS"</li>
+          </ul>
+        </li>
+        <li>Open Copilot Chat &rarr; <em>"Analyze this DNS log file and identify any suspicious patterns"</em>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Show Copilot identifying the C2 traffic, entropy analysis, base64 patterns</li>
+          </ul>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/01-dns-alert/remediate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/01-dns-alert/remediate.py</span><br>
+              <span class="success">Security report: 115 C2 queries, 32 TXT exfil attempts, source IP identified</span>
+            </div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'gh workflow run dns-threat-detection.yml')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">gh workflow run dns-threat-detection.yml</span></div>
+          </div>
+        </li>
+        <li>Open GitHub Actions &rarr; Show the workflow running, DNS analysis step output, threat report artifact</li>
+        <li><strong>"GHAS couldn't see this. The custom agent caught it in seconds."</strong></li>
+      </ol>
+    </div>
+
+    <div class="callout callout-purple">
+      <div class="callout-title">How DNS Tunneling Works</div>
+      The attacker encodes stolen data as subdomain queries: instead of looking up <code>google.com</code>,
+      they look up <code>c3RvbGVuX2RhdGE.evil-domain.com</code> &mdash; that random subdomain IS the
+      stolen data, base64-encoded. The agent detects this by measuring entropy.
+    </div>
+
+    <div class="stat-row" style="margin-top:16px;">
+      <div class="stat-card stat-red">
+        <div class="stat-value">115</div>
+        <div class="stat-label">C2 Queries Found</div>
+      </div>
+      <div class="stat-card stat-yellow">
+        <div class="stat-value">32</div>
+        <div class="stat-label">TXT Exfil Attempts</div>
+      </div>
+      <div class="stat-card stat-green">
+        <div class="stat-value">140</div>
+        <div class="stat-label">Clean Queries</div>
+      </div>
+      <div class="stat-card stat-purple">
+        <div class="stat-value">4.8</div>
+        <div class="stat-label">Avg Entropy Score</div>
+      </div>
+    </div>
+
+    <div class="before-after" style="margin-top:16px;">
+      <div class="ba-panel ba-before">
+        <span class="ba-label">Suspicious DNS Query</span>
+        <span style="color:#f85149;">dGhpcyBpcyBzZWNyZXQ</span><br>
+        <span style="color:#8b949e;">&nbsp;&nbsp;.evil-c2.example.com</span><br>
+        <span style="color:#f85149;">Type: A | Entropy: 4.2</span><br>
+        <span style="color:#f85149;">Frequency: 3.2 req/sec</span>
+      </div>
+      <div class="ba-panel ba-after">
+        <span class="ba-label">Normal DNS Query</span>
+        <span style="color:#3fb950;">www.microsoft.com</span><br>
+        <span style="color:#8b949e;">&nbsp;&nbsp;(legitimate lookup)</span><br>
+        <span style="color:#3fb950;">Type: A | Entropy: 1.8</span><br>
+        <span style="color:#3fb950;">Frequency: 0.1 req/sec</span>
+      </div>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      DNS tunneling is one of the sneakiest exfiltration methods because DNS traffic is almost never
+      blocked &mdash; every network needs DNS. The attacker encodes stolen data as subdomain queries:
+      instead of looking up "google.com", they look up "c3RvbGVuX2RhdGE.evil-domain.com" &mdash; that
+      random subdomain IS the stolen data, base64-encoded. The agent detects this by measuring entropy &mdash;
+      random strings have high entropy, legitimate domains don't. Simple math, devastating effectiveness.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 10: Firewall & IaC Hardening ===== -->
+<section class="scene agent-scene" id="scene-10" data-scene="10">
+  <div class="scene-header" onclick="jumpToScene(10)">
+    <div class="scene-number">10</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 2 &bull; Custom Agent</div>
+      <div class="scene-title">Firewall &amp; Infrastructure Hardening</div>
+    </div>
+    <div class="scene-time">~4 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,10)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "Now the team needs to contain the threat and harden their infrastructure."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/03-firewall-containment/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/03-firewall-containment/simulate.py</span><br>
+              <span class="warn">Default allow outbound, DNS wide open, SSH from 0.0.0.0/0</span>
+            </div>
+          </div>
+        </li>
+        <li>Open <code>vulnerable-app/firewall_rules.json</code> in VS Code
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Point out dangerous rules: "allow all outbound" and "SSH from anywhere"</li>
+            <li>Ask Copilot: <em>"What's wrong with these firewall rules?"</em></li>
+          </ul>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/03-firewall-containment/remediate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/03-firewall-containment/remediate.py</span><br>
+              <span class="success">Hardened: default deny, DNS to approved resolvers only, SSH bastion only</span>
+            </div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/06-iac-hardening/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/06-iac-hardening/simulate.py</span><br>
+              <span class="warn">Insecure Bicep: public storage, no encryption, no managed identity</span>
+            </div>
+          </div>
+        </li>
+        <li>Open <code>infra/main.bicep</code> in VS Code
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Ask Copilot: <em>"Review this Bicep template for CIS benchmark compliance"</em></li>
+            <li>Show Copilot identifying all the misconfigurations</li>
+          </ul>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/06-iac-hardening/remediate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/06-iac-hardening/remediate.py</span><br>
+              <span class="success">Hardened Bicep: private endpoints, encryption, managed identity</span>
+            </div>
+          </div>
+        </li>
+        <li>Trigger:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'gh workflow run iac-security-check.yml')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">gh workflow run iac-security-check.yml</span></div>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="before-after">
+      <div class="ba-panel ba-before">
+        <span class="ba-label">&#10060; Before (Insecure)</span>
+        <span style="color:#f85149;">"default_action": "allow"</span><br>
+        <span style="color:#f85149;">"ssh_source": "0.0.0.0/0"</span><br>
+        <span style="color:#f85149;">"dns_outbound": "any"</span><br>
+        <span style="color:#f85149;">"egress_filter": "none"</span><br>
+        <span style="color:#f85149;">"logging": "disabled"</span>
+      </div>
+      <div class="ba-panel ba-after">
+        <span class="ba-label">&#9989; After (Hardened)</span>
+        <span style="color:#3fb950;">"default_action": "deny"</span><br>
+        <span style="color:#3fb950;">"ssh_source": "10.0.1.0/24"</span><br>
+        <span style="color:#3fb950;">"dns_outbound": "168.63.129.16"</span><br>
+        <span style="color:#3fb950;">"egress_filter": "allowlist"</span><br>
+        <span style="color:#3fb950;">"logging": "enabled"</span>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card stat-red">
+        <div class="stat-value">12</div>
+        <div class="stat-label">CIS Failures Before</div>
+      </div>
+      <div class="stat-card stat-green">
+        <div class="stat-value">0</div>
+        <div class="stat-label">CIS Failures After</div>
+      </div>
+      <div class="stat-card stat-yellow">
+        <div class="stat-value">50+</div>
+        <div class="stat-label">Controls Checked</div>
+      </div>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      This is where the custom agent shines. GHAS can check your Python code for SQL injection &mdash;
+      but it can't check your Bicep template for missing encryption at rest, or your firewall rules for
+      overly permissive outbound access. The custom agent knows CIS benchmarks for Azure, AWS, and GCP.
+      It checks every resource against 50+ controls. And when it finds issues, it generates the hardened
+      version automatically.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 11: VPN & Network Compliance ===== -->
+<section class="scene agent-scene" id="scene-11" data-scene="11">
+  <div class="scene-header" onclick="jumpToScene(11)">
+    <div class="scene-number">11</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 2 &bull; Custom Agent</div>
+      <div class="scene-title">VPN &amp; Network Compliance</div>
+    </div>
+    <div class="scene-time">~3 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,11)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "The security team also discovers the VPN is using weak cryptography from 2015."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/08-vpn-audit/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/08-vpn-audit/simulate.py</span><br>
+              <span class="warn">IKEv1, DES encryption, MD5 hash, pre-shared key "password123"</span>
+            </div>
+          </div>
+        </li>
+        <li>Open <code>vulnerable-app/vpn_config.json</code> in VS Code
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Point out each weakness</li>
+            <li>Ask Copilot: <em>"Audit this VPN configuration for cryptographic weaknesses"</em></li>
+          </ul>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/08-vpn-audit/remediate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/08-vpn-audit/remediate.py</span><br>
+              <span class="success">IKEv2, AES-256-GCM, SHA-384, certificate-based auth, MFA required</span>
+            </div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/10-network-compliance/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/10-network-compliance/simulate.py</span><br>
+              <span class="warn">Switches with default creds, SNMP v2 with "public", no syslog</span>
+            </div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/10-network-compliance/remediate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/10-network-compliance/remediate.py</span><br>
+              <span class="success">Compliance report: CIS, NIST, PCI-DSS scores before/after</span>
+            </div>
+          </div>
+        </li>
+        <li>Trigger:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'gh workflow run compliance-check.yml')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">gh workflow run compliance-check.yml</span></div>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="before-after">
+      <div class="ba-panel ba-before">
+        <span class="ba-label">&#10060; Before (Weak Crypto)</span>
+        <span style="color:#f85149;">"protocol": "IKEv1"</span><br>
+        <span style="color:#f85149;">"encryption": "DES"</span><br>
+        <span style="color:#f85149;">"hash": "MD5"</span><br>
+        <span style="color:#f85149;">"auth": "pre-shared-key"</span><br>
+        <span style="color:#f85149;">"psk": "password123"</span>
+      </div>
+      <div class="ba-panel ba-after">
+        <span class="ba-label">&#9989; After (Modern Crypto)</span>
+        <span style="color:#3fb950;">"protocol": "IKEv2"</span><br>
+        <span style="color:#3fb950;">"encryption": "AES-256-GCM"</span><br>
+        <span style="color:#3fb950;">"hash": "SHA-384"</span><br>
+        <span style="color:#3fb950;">"auth": "certificate"</span><br>
+        <span style="color:#3fb950;">"mfa": "required"</span>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card stat-red">
+        <div class="stat-value">34%</div>
+        <div class="stat-label">CIS Score Before</div>
+      </div>
+      <div class="stat-card stat-green">
+        <div class="stat-value">97%</div>
+        <div class="stat-label">CIS Score After</div>
+      </div>
+      <div class="stat-card stat-purple">
+        <div class="stat-value">91%</div>
+        <div class="stat-label">NIST Score After</div>
+      </div>
+      <div class="stat-card stat-yellow">
+        <div class="stat-value">95%</div>
+        <div class="stat-label">PCI-DSS After</div>
+      </div>
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      VPN crypto is one of those things nobody checks until there's a breach. IKEv1 with DES and MD5 &mdash;
+      that's 2005-era crypto. It can be broken in minutes with modern hardware. The agent knows current crypto
+      standards and flags anything below the bar. Same with network compliance &mdash; SNMP v2 with "public" as
+      the community string is shockingly common. The agent catches all of it.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SCENE 12: The Incident Report ===== -->
+<section class="scene agent-scene" id="scene-12" data-scene="12">
+  <div class="scene-header" onclick="jumpToScene(12)">
+    <div class="scene-number">12</div>
+    <div class="scene-title-block">
+      <div class="scene-label">Part 2 &bull; Custom Agent</div>
+      <div class="scene-title">The Incident Report</div>
+    </div>
+    <div class="scene-time">~3 min</div>
+    <button class="scene-check" onclick="event.stopPropagation();toggleCheck(this,12)" title="Mark complete">&#10003;</button>
+  </div>
+  <div class="scene-body">
+    <div class="story-text">
+      "It's 5 PM. Sarah needs to brief the board. The agent generates the report."
+    </div>
+
+    <div class="demo-steps">
+      <h4>Demo Steps</h4>
+      <ol>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/12-incident-report/simulate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/12-incident-report/simulate.py</span><br>
+              <span class="output">Raw incident data assembled from the day's events</span>
+            </div>
+          </div>
+        </li>
+        <li>Run:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'python scenarios/12-incident-report/remediate.py')">Copy</button>
+            </div>
+            <div class="terminal-body">
+              <span class="prompt">$ </span><span class="cmd">python scenarios/12-incident-report/remediate.py</span><br>
+              <span class="success">Generated incident_report.md &mdash; executive summary, timeline, MITRE ATT&amp;CK mapping</span>
+            </div>
+          </div>
+        </li>
+        <li>Open <code>vulnerable-app/incident_report.md</code> in VS Code
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>Walk through each section</li>
+            <li>"The agent compiled everything from today &mdash; DNS findings, firewall changes, secret rotation,
+                compliance scores &mdash; into one executive report"</li>
+          </ul>
+        </li>
+        <li>Open <code>vulnerable-app/executive_summary.md</code>
+          <ul style="list-style:disc;margin-top:6px;padding-left:20px;">
+            <li>"This is the 1-pager for the board. Non-technical. Clear. Actionable."</li>
+          </ul>
+        </li>
+        <li>Trigger:
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+              <span class="terminal-header-title">Terminal</span>
+              <button class="copy-btn" onclick="copyCmd(this,'gh workflow run incident-response.yml')">Copy</button>
+            </div>
+            <div class="terminal-body"><span class="prompt">$ </span><span class="cmd">gh workflow run incident-response.yml</span></div>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="callout callout-purple" style="margin-top:16px;">
+      <div class="callout-title">MITRE ATT&amp;CK Techniques Covered</div>
+      <div class="mitre-grid">
+        <div class="mitre-badge">T1071 &mdash; Application Layer Protocol</div>
+        <div class="mitre-badge">T1048 &mdash; Exfiltration Over Alternative Protocol</div>
+        <div class="mitre-badge">T1059 &mdash; Command and Scripting Interpreter</div>
+        <div class="mitre-badge">T1078 &mdash; Valid Accounts</div>
+        <div class="mitre-badge">T1552 &mdash; Unsecured Credentials</div>
+        <div class="mitre-badge">T1190 &mdash; Exploit Public-Facing Application</div>
+        <div class="mitre-badge">T1133 &mdash; External Remote Services</div>
+        <div class="mitre-badge">T1562 &mdash; Impair Defenses</div>
+      </div>
+    </div>
+
+    <div class="stat-row" style="margin-top:16px;">
+      <div class="stat-card stat-red">
+        <div class="stat-value">115</div>
+        <div class="stat-label">C2 Queries Detected</div>
+      </div>
+      <div class="stat-card stat-yellow">
+        <div class="stat-value">7</div>
+        <div class="stat-label">Secrets Rotated</div>
+      </div>
+      <div class="stat-card stat-green">
+        <div class="stat-value">12</div>
+        <div class="stat-label">Controls Remediated</div>
+      </div>
+      <div class="stat-card stat-purple">
+        <div class="stat-value">1</div>
+        <div class="stat-label">Board Report Generated</div>
+      </div>
+    </div>
+
+    <div class="callout callout-yellow" style="margin-top:16px;">
+      <div class="callout-title">Time Saved</div>
+      Traditional incident response for this scope: <strong>3-5 business days</strong> with a team of 4 analysts.<br>
+      With GHAS + Custom Agent: <strong>8 hours</strong>, primarily automated, one engineer supervising.
+    </div>
+
+    <div class="presenter-notes">
+      <div class="notes-label">&#127908; Presenter Notes</div>
+      This is the closer. The board doesn't want to hear about entropy scores and base64 encoding.
+      They want to know: what happened, what's the impact, what did we do, and are we safe now.
+      The agent takes all the technical data from the day and produces a board-ready report.
+      It maps to MITRE ATT&amp;CK for the security team, and writes a plain-English summary for the
+      executives. This used to take a senior analyst 2-3 days. The agent does it in seconds.
+    </div>
+  </div>
+</section>
+
+<!-- ===== CLOSING SLIDE ===== -->
+<section class="closing-card" id="scene-closing">
+  <h3>What We Showed Today</h3>
+  <div class="closing-columns">
+    <div class="closing-col ghas-col">
+      <h4>Part 1 &mdash; GHAS (Built-in, 5 min to enable)</h4>
+      <ul>
+        <li>&#9989; Secret Scanning caught hardcoded credentials</li>
+        <li>&#9989; Push Protection blocked secrets before they entered the repo</li>
+        <li>&#9989; CodeQL found SQL injection, XSS, command injection</li>
+        <li>&#9989; Copilot Autofix generated the fixes</li>
+        <li>&#9989; Dependabot flagged vulnerable dependencies and auto-generated PRs</li>
+      </ul>
+    </div>
+    <div class="closing-col agent-col">
+      <h4>Part 2 &mdash; Custom Agent (Fills every remaining gap)</h4>
+      <ul>
+        <li>&#9989; DNS monitoring detected exfiltration via tunneling</li>
+        <li>&#9989; Firewall audit found overly permissive rules</li>
+        <li>&#9989; IaC scanning caught CIS benchmark failures in Bicep/Terraform</li>
+        <li>&#9989; VPN audit found weak cryptography</li>
+        <li>&#9989; Compliance monitoring scored CIS / NIST / PCI-DSS</li>
+        <li>&#9989; Incident reporting generated executive-ready reports</li>
+      </ul>
+    </div>
+  </div>
+  <div class="key-message" style="margin-top:32px;background:linear-gradient(90deg,#0f2d1a,#1c1236);border:2px solid #58a6ff;color:#e6edf3;">
+    Together: Complete security coverage from code to cloud.
+  </div>
+
+  <div class="presenter-notes">
+    <div class="notes-label">&#127908; Presenter Notes</div>
+    End strong. Recap both parts. The message is: GHAS gives you incredible code security out of the box.
+    The custom agent extends that to your entire infrastructure. No gaps. And everything runs on GitHub &mdash;
+    one platform, one workflow, one security posture.
+  </div>
+</section>
+
+<!-- ===== CALL TO ACTION ===== -->
+<section class="cta-card" id="scene-cta">
+  <h3>Next Steps</h3>
+  <ol>
+    <li><strong>Enable GHAS</strong> on your repos <span style="color:#8b949e;">(5 minutes)</span></li>
+    <li><strong>Deploy the custom security agent</strong> <span style="color:#8b949e;">(1 hour)</span></li>
+    <li><strong>Configure prompt files</strong> for your environment <span style="color:#8b949e;">(1 day)</span></li>
+    <li><strong>Continuous monitoring begins</strong></li>
+  </ol>
+  <div class="cta-final">Let's schedule the pilot.</div>
+</section>
+
+</main>
+
+<!-- ===== KEYBOARD HINTS ===== -->
+<div class="keyboard-hints" id="kbHints">
+  <span><span class="kbd">N</span> Notes</span>
+  <span><span class="kbd">T</span> Timer</span>
+  <span><span class="kbd">&#8592;</span><span class="kbd">&#8594;</span> Navigate</span>
+  <span><span class="kbd">1</span>-<span class="kbd">9</span>,<span class="kbd">0</span> Scenes</span>
+</div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+(function() {
+  'use strict';
+
+  // ===== CONSTANTS =====
+  var TOTAL_SCENES = 12;
+  var currentScene = 0;
+  var timerRunning = false;
+  var timerStart = 0;
+  var timerElapsed = 0;
+  var timerInterval = null;
+  var notesVisible = false;
+  var scenesDone = {};
+
+  // ===== INIT =====
+  function init() {
+    buildProgressDots();
+    updateProgress();
+    loadState();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  // ===== PROGRESS DOTS =====
+  function buildProgressDots() {
+    var container = document.getElementById('progressDots');
+    for (var i = 1; i <= TOTAL_SCENES; i++) {
+      var dot = document.createElement('button');
+      dot.className = 'progress-dot' + (i <= 6 ? ' part1' : ' part2');
+      dot.setAttribute('data-scene', i);
+      dot.setAttribute('title', 'Scene ' + i);
+      dot.addEventListener('click', (function(n) {
+        return function() { jumpToScene(n); };
+      })(i));
+      container.appendChild(dot);
+    }
+  }
+
+  // ===== SCROLL DETECTION =====
+  function onScroll() {
+    var best = 0;
+    var bestDist = Infinity;
+    for (var i = 1; i <= TOTAL_SCENES; i++) {
+      var el = document.getElementById('scene-' + i);
+      if (el) {
+        var rect = el.getBoundingClientRect();
+        var dist = Math.abs(rect.top - 80);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      }
+    }
+    if (best !== currentScene) {
+      currentScene = best;
+      updateProgress();
+    }
+    updatePartTabs();
+  }
+
+  function updateProgress() {
+    document.getElementById('progressText').textContent =
+      'Scene ' + currentScene + ' of ' + TOTAL_SCENES;
+    var dots = document.querySelectorAll('.progress-dot');
+    for (var i = 0; i < dots.length; i++) {
+      var n = parseInt(dots[i].getAttribute('data-scene'), 10);
+      dots[i].classList.toggle('active', n === currentScene);
+      dots[i].classList.toggle('done', !!scenesDone[n]);
+    }
+  }
+
+  function updatePartTabs() {
+    var tabG = document.getElementById('tabGhas');
+    var tabA = document.getElementById('tabAgent');
+    tabG.className = 'part-tab' + (currentScene >= 1 && currentScene <= 6 ? ' active-ghas' : '');
+    tabA.className = 'part-tab' + (currentScene >= 7 ? ' active-agent' : '');
+  }
+
+  // ===== NAVIGATION =====
+  window.jumpToScene = function(n) {
+    var el = document.getElementById('scene-' + n);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      currentScene = n;
+      updateProgress();
+    }
+  };
+
+  window.scrollToPart = function(partId) {
+    var el = document.getElementById(partId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // ===== TIMER =====
+  window.toggleTimer = function() {
+    var btn = document.getElementById('timerBtn');
+    if (timerRunning) {
+      clearInterval(timerInterval);
+      timerElapsed += Date.now() - timerStart;
+      timerRunning = false;
+      btn.classList.remove('running');
+    } else {
+      timerStart = Date.now();
+      timerRunning = true;
+      btn.classList.add('running');
+      timerInterval = setInterval(updateTimerDisplay, 1000);
+    }
+  };
+
+  function updateTimerDisplay() {
+    var total = timerElapsed + (timerRunning ? Date.now() - timerStart : 0);
+    var secs = Math.floor(total / 1000);
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    document.getElementById('timerDisplay').textContent =
+      (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // ===== NOTES TOGGLE =====
+  window.toggleNotes = function() {
+    notesVisible = !notesVisible;
+    document.body.classList.toggle('show-notes', notesVisible);
+    document.getElementById('notesBtn').classList.toggle('on', notesVisible);
+  };
+
+  // ===== COPY COMMAND =====
+  window.copyCmd = function(btn, text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        showCopied(btn);
+      });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); showCopied(btn); } catch(e) {}
+      document.body.removeChild(ta);
+    }
+  };
+
+  function showCopied(btn) {
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.classList.remove('copied');
+    }, 1500);
+  }
+
+  // ===== SCENE CHECK =====
+  window.toggleCheck = function(btn, n) {
+    if (scenesDone[n]) {
+      delete scenesDone[n];
+      btn.classList.remove('checked');
+    } else {
+      scenesDone[n] = true;
+      btn.classList.add('checked');
+    }
+    updateProgress();
+    saveState();
+  };
+
+  // ===== KEYBOARD SHORTCUTS =====
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    var key = e.key;
+
+    if (key === 'n' || key === 'N') { e.preventDefault(); toggleNotes(); }
+    if (key === 't' || key === 'T') { e.preventDefault(); toggleTimer(); }
+
+    if (key === 'ArrowRight' || key === 'ArrowDown') {
+      e.preventDefault();
+      if (currentScene < TOTAL_SCENES) jumpToScene(currentScene + 1);
+    }
+    if (key === 'ArrowLeft' || key === 'ArrowUp') {
+      e.preventDefault();
+      if (currentScene > 1) jumpToScene(currentScene - 1);
+    }
+
+    // 1-9, 0 (0 = 10)
+    if (key >= '1' && key <= '9') { e.preventDefault(); jumpToScene(parseInt(key, 10)); }
+    if (key === '0') { e.preventDefault(); jumpToScene(10); }
+  });
+
+  // ===== PERSIST STATE =====
+  function saveState() {
+    try {
+      localStorage.setItem('ghas-demo-done', JSON.stringify(scenesDone));
+    } catch(e) {}
+  }
+
+  function loadState() {
+    try {
+      var saved = localStorage.getItem('ghas-demo-done');
+      if (saved) {
+        scenesDone = JSON.parse(saved);
+        for (var n in scenesDone) {
+          if (scenesDone.hasOwnProperty(n)) {
+            var el = document.querySelector('#scene-' + n + ' .scene-check');
+            if (el) el.classList.add('checked');
+          }
+        }
+        updateProgress();
+      }
+    } catch(e) {}
+  }
+
+  // ===== SMOOTH HEADER OFFSET =====
+  // Offset scroll to account for sticky header
+  var style = document.createElement('style');
+  style.textContent = '[id^="scene-"], [id^="part"] { scroll-margin-top: 72px; }';
+  document.head.appendChild(style);
+
+  // ===== START =====
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+</body>
+</html>
