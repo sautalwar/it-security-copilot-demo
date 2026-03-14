@@ -1,0 +1,1801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Continuous Security Agent — Always-On Protection with GitHub</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d1117;
+    --bg-card:   #161b22;
+    --bg-code:   #1c2129;
+    --border:    #30363d;
+    --text:      #c9d1d9;
+    --text-dim:  #8b949e;
+    --heading:   #e6edf3;
+    --link:      #58a6ff;
+    --green:     #3fb950;
+    --blue:      #58a6ff;
+    --purple:    #bc8cff;
+    --red:       #f85149;
+    --orange:    #d29922;
+    --yellow:    #e3b341;
+    --cyan:      #39d353;
+  }
+
+  html { scroll-behavior: smooth; font-size: 16px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    overflow-x: hidden;
+  }
+
+  /* ── Layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Typography ── */
+  h1, h2, h3, h4 { color: var(--heading); font-weight: 600; }
+  h1 { font-size: 2.4rem; margin-bottom: .4em; }
+  h2 { font-size: 1.7rem; margin-bottom: .6em; border-bottom: 1px solid var(--border); padding-bottom: .4em; }
+  h3 { font-size: 1.25rem; margin-bottom: .5em; }
+  p  { margin-bottom: 1em; }
+  a  { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul, ol { margin-left: 1.4em; margin-bottom: 1em; }
+  li { margin-bottom: .35em; }
+  strong { color: var(--heading); }
+  em { color: var(--text-dim); font-style: italic; }
+
+  /* ── Sections ── */
+  section {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section:last-of-type { border-bottom: none; }
+
+  .section-number {
+    display: inline-block;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    text-align: center;
+    line-height: 32px;
+    font-size: .85rem;
+    font-weight: 700;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  /* ── Header ── */
+  .hero {
+    text-align: center;
+    padding: 100px 0 70px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .hero h1 { font-size: 2.6rem; }
+  .hero .subtitle {
+    font-size: 1.15rem;
+    color: var(--text-dim);
+    max-width: 720px;
+    margin: .6em auto 0;
+  }
+  .badge-row {
+    margin-top: 22px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+    border: 1px solid;
+  }
+  .badge-green  { color: var(--green);  border-color: var(--green);  }
+  .badge-blue   { color: var(--blue);   border-color: var(--blue);   }
+  .badge-purple { color: var(--purple); border-color: var(--purple); }
+
+  .notes-hint {
+    position: absolute;
+    bottom: 18px; right: 24px;
+    font-size: .75rem;
+    color: var(--text-dim);
+    background: var(--bg-card);
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .notes-hint kbd {
+    background: var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h3 .emoji { margin-right: 8px; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .layer-card {
+    border-top: 3px solid;
+    position: relative;
+  }
+  .layer-card.layer-1 { border-top-color: var(--green); }
+  .layer-card.layer-2 { border-top-color: var(--blue); }
+  .layer-card.layer-3 { border-top-color: var(--purple); }
+
+  .layer-badge {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    padding: 2px 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .layer-1 .layer-badge { background: rgba(63,185,80,.15); color: var(--green); }
+  .layer-2 .layer-badge { background: rgba(88,166,255,.15); color: var(--blue); }
+  .layer-3 .layer-badge { background: rgba(188,140,255,.15); color: var(--purple); }
+
+  .response-tag {
+    display: inline-block;
+    font-size: .72rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+  .response-tag.fast   { background: rgba(63,185,80,.18); color: var(--green); }
+  .response-tag.medium { background: rgba(88,166,255,.18); color: var(--blue); }
+  .response-tag.slow   { background: rgba(188,140,255,.18); color: var(--purple); }
+
+  /* ── Code Blocks ── */
+  .code-block {
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .code-block pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: .82rem;
+    line-height: 1.55;
+    color: var(--text);
+    tab-size: 2;
+  }
+  .code-label {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 6px;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 8px; right: 10px;
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: .7rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .2s;
+    z-index: 2;
+  }
+  .code-block:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: var(--blue); color: #fff; }
+  .copy-btn.copied { background: var(--green); color: #fff; }
+
+  /* ── Collapsible ── */
+  .collapsible-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--heading);
+    transition: background .2s;
+  }
+  .collapsible-toggle:hover { background: var(--border); }
+  .collapsible-toggle .arrow {
+    display: inline-block;
+    transition: transform .25s;
+    font-size: .7rem;
+  }
+  .collapsible-toggle.open .arrow { transform: rotate(90deg); }
+  .collapsible-content {
+    display: none;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+  .collapsible-content.show { display: block; }
+  .collapsible-content pre {
+    border: none;
+    border-radius: 0 0 8px 8px;
+    margin: 0;
+  }
+
+  /* ── Architecture Diagram ── */
+  .arch-diagram {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 36px 28px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+  .arch-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+  }
+  .arch-box {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    text-align: center;
+    min-width: 140px;
+    font-size: .82rem;
+  }
+  .arch-box.highlight { border-color: var(--blue); }
+  .arch-box.green-border  { border-color: var(--green);  border-width: 2px; }
+  .arch-box.blue-border   { border-color: var(--blue);   border-width: 2px; }
+  .arch-box.purple-border { border-color: var(--purple); border-width: 2px; }
+  .arch-box.red-border    { border-color: var(--red);    border-width: 2px; }
+  .arch-box .box-title {
+    font-weight: 700;
+    color: var(--heading);
+    margin-bottom: 6px;
+    font-size: .85rem;
+  }
+  .arch-box ul { list-style: none; margin: 0; padding: 0; text-align: left; }
+  .arch-box li { font-size: .75rem; color: var(--text-dim); margin-bottom: 2px; }
+  .arch-box li::before { content: '• '; color: var(--blue); }
+  .arch-arrow {
+    text-align: center;
+    font-size: 1.4rem;
+    color: var(--text-dim);
+    margin: 10px 0;
+    letter-spacing: 2px;
+  }
+  .arch-wide {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  .arch-label {
+    font-size: .65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .arch-container {
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 20px;
+    position: relative;
+    margin-bottom: 0;
+  }
+  .arch-container .arch-container-title {
+    position: absolute;
+    top: -11px;
+    left: 20px;
+    background: var(--bg-card);
+    padding: 0 10px;
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--heading);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 20px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+  }
+  th {
+    background: var(--bg-code);
+    color: var(--heading);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:hover td { background: rgba(88,166,255,.04); }
+  .tag-layer1 { color: var(--green); font-weight: 600; }
+  .tag-layer2 { color: var(--blue); font-weight: 600; }
+  .tag-layer3 { color: var(--purple); font-weight: 600; }
+  .tag-layer12 { font-weight: 600; }
+  .tag-layer12 .l1 { color: var(--green); }
+  .tag-layer12 .l3 { color: var(--purple); }
+
+  /* ── Presenter Notes ── */
+  .notes {
+    display: none;
+    background: rgba(210,153,34,.08);
+    border-left: 3px solid var(--orange);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: .85rem;
+    color: var(--text-dim);
+  }
+  .notes strong { color: var(--orange); }
+  body.show-notes .notes { display: block; }
+
+  /* ── Inline flow diagram ── */
+  .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 28px 0;
+  }
+  .flow-box {
+    background: var(--bg-code);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 22px;
+    text-align: center;
+    font-weight: 600;
+    font-size: .9rem;
+    color: var(--heading);
+    min-width: 120px;
+  }
+  .flow-box.green  { border-color: var(--green);  color: var(--green); }
+  .flow-box.blue   { border-color: var(--blue);   color: var(--blue); }
+  .flow-box.purple { border-color: var(--purple); color: var(--purple); }
+  .flow-box.red    { border-color: var(--red);    color: var(--red); }
+  .flow-arrow {
+    font-size: 1.3rem;
+    color: var(--text-dim);
+    padding: 0 10px;
+  }
+
+  /* ── Steps ── */
+  .step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+    align-items: flex-start;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 30px; height: 30px;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 30px;
+    font-size: .8rem;
+    font-weight: 700;
+  }
+  .step-body { flex: 1; }
+
+  /* ── Chat bubble ── */
+  .chat-window {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    max-width: 600px;
+  }
+  .chat-msg {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .chat-msg:last-child { margin-bottom: 0; }
+  .chat-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .75rem;
+    font-weight: 700;
+  }
+  .chat-avatar.user { background: var(--blue); color: #fff; }
+  .chat-avatar.agent { background: var(--purple); color: #fff; }
+  .chat-bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: .82rem;
+    line-height: 1.5;
+    max-width: 480px;
+  }
+  .chat-bubble .status-ok  { color: var(--green); }
+  .chat-bubble .status-warn { color: var(--orange); }
+  .chat-bubble .status-err { color: var(--red); }
+
+  /* ── Benefit cards ── */
+  .benefit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin: 16px 0;
+  }
+  .benefit-item {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: .82rem;
+  }
+  .benefit-item .bi-icon { font-size: 1.2rem; margin-bottom: 6px; }
+  .benefit-item strong { display: block; margin-bottom: 4px; }
+
+  /* ── Cost table ── */
+  .cost-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .cost-card {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+  }
+  .cost-card .price {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--green);
+    margin: 8px 0 4px;
+  }
+  .cost-card .price-label {
+    font-size: .75rem;
+    color: var(--text-dim);
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 48px 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: .82rem;
+  }
+  footer .footer-links {
+    margin-top: 12px;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .copilot-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--heading);
+    margin-bottom: 12px;
+  }
+  .copilot-badge .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .hero h1 { font-size: 1.8rem; }
+    .arch-row { flex-direction: column; align-items: center; }
+    .flow-row { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); padding: 6px 0; }
+    section { padding: 40px 0; }
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ HEADER ═══════════════════════ -->
+<header class="hero container" id="top">
+  <h1>🛡️ Continuous Security Agent</h1>
+  <p class="subtitle">How to build a custom security agent that monitors, detects, and remediates 24/7 — powered by GitHub Actions, Copilot, and self-hosted runners</p>
+  <div class="badge-row">
+    <span class="badge badge-green">Layer 1 · Real-Time</span>
+    <span class="badge badge-blue">Layer 2 · Scheduled</span>
+    <span class="badge badge-purple">Layer 3 · AI-Powered</span>
+  </div>
+  <div class="notes-hint">Press <kbd>N</kbd> to toggle presenter notes</div>
+</header>
+
+<!-- ═══════════════ SECTION 1 — THE VISION ═══════════════ -->
+<section id="section-1">
+  <div class="container">
+    <h2><span class="section-number">1</span>The Vision</h2>
+
+    <div class="card">
+      <p><strong>"What if the 12 security scenarios we just demonstrated didn't need a human to trigger them?"</strong></p>
+      <p>What if an agent ran continuously — watching for DNS tunneling, secret exposure, misconfigurations, compliance drift — and <em>auto-remediated</em> every finding before your team even saw a ticket?</p>
+      <p><strong>That's exactly what we're going to build.</strong></p>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-box">📡 Events</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box blue">🤖 Agent</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box green">🔍 Detection</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box purple">🔧 Remediation</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box red">🔔 Notification</div>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> This is the transformative moment in the presentation. Customers spend millions on SIEM tools — Splunk, Sentinel, CrowdStrike — but still have coverage gaps because <em>humans have to respond</em>. An alert fires at 2 AM, and nobody looks at it until 9 AM. Seven hours of exposure. An automated agent closes the loop: detect → remediate → notify, all within minutes, 24/7. This isn't replacing your SOC team — it's giving them superpowers.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 2 — ARCHITECTURE ═══════════════ -->
+<section id="section-2">
+  <div class="container">
+    <h2><span class="section-number">2</span>Architecture Overview</h2>
+
+    <div class="arch-diagram">
+      <!-- GitHub Repository container -->
+      <div class="arch-container" style="border-color: var(--text-dim);">
+        <span class="arch-container-title">GitHub Repository</span>
+
+        <!-- Source row -->
+        <div class="arch-label">Event Sources</div>
+        <div class="arch-row">
+          <div class="arch-box green-border">
+            <div class="box-title">📝 Code Changes</div>
+            <ul><li>Commits &amp; PRs</li><li>Branch pushes</li></ul>
+          </div>
+          <div class="arch-box blue-border">
+            <div class="box-title">🏗️ IaC Templates</div>
+            <ul><li>Terraform / Bicep</li><li>ARM templates</li></ul>
+          </div>
+          <div class="arch-box purple-border">
+            <div class="box-title">⚙️ Configs &amp; Policies</div>
+            <ul><li>OPA / Rego</li><li>Security policies</li></ul>
+          </div>
+        </div>
+
+        <!-- Arrow down -->
+        <div class="arch-arrow">▼</div>
+
+        <!-- Triggers -->
+        <div class="arch-row">
+          <div class="arch-box highlight arch-wide">
+            <div class="box-title">⚡ GitHub Actions — Event Triggers</div>
+            <ul>
+              <li><code>push</code> / <code>pull_request</code> / <code>schedule</code></li>
+              <li><code>workflow_dispatch</code> / <code>repository_dispatch</code></li>
+              <li><code>issues</code> / <code>alert</code> webhooks</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="arch-arrow">▼</div>
+
+        <!-- Agent -->
+        <div class="arch-row">
+          <div class="arch-box arch-wide" style="border-color: var(--orange); border-width: 2px;">
+            <div class="box-title">🤖 Security Agent (Self-Hosted Runner)</div>
+            <div style="display:flex; gap:12px; justify-content:center; margin-top:10px; flex-wrap:wrap;">
+              <div class="arch-box green-border" style="min-width:120px; padding:10px 14px;">
+                <div class="box-title" style="font-size:.78rem;">🔍 Scanner</div>
+              </div>
+              <div class="arch-box blue-border" style="min-width:120px; padding:10px 14px;">
+                <div class="box-title" style="font-size:.78rem;">🧠 Analyzer</div>
+              </div>
+              <div class="arch-box purple-border" style="min-width:120px; padding:10px 14px;">
+                <div class="box-title" style="font-size:.78rem;">🔧 Remediator</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">▼</div>
+
+        <!-- Response Actions -->
+        <div class="arch-row">
+          <div class="arch-box arch-wide red-border">
+            <div class="box-title">🚀 Response Actions</div>
+            <ul>
+              <li>Create Issue &nbsp;·&nbsp; Open PR with fix</li>
+              <li>Send Alert &nbsp;·&nbsp; Block deployment</li>
+              <li>Update Dashboard &nbsp;·&nbsp; Rotate secrets</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> Walk through each layer. "The agent is essentially a set of GitHub Actions workflows that run on a schedule or react to events. The self-hosted runner gives us persistence — it's always on, always watching. Think of it as a security appliance that lives inside your CI/CD pipeline. The Scanner finds issues, the Analyzer correlates and prioritizes them, and the Remediator automatically generates fixes. All three components run on every cycle."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 3 — THREE LAYERS ═══════════════ -->
+<section id="section-3">
+  <div class="container">
+    <h2><span class="section-number">3</span>Three Layers of Protection</h2>
+
+    <div class="card-grid">
+      <!-- Layer 1 -->
+      <div class="card layer-card layer-1">
+        <span class="layer-badge">Layer 1 · Event-Driven</span>
+        <h3>⚡ Real-Time Protection</h3>
+        <p><strong>Triggered by:</strong> <code>push</code>, <code>pull_request</code>, <code>issue</code> creation</p>
+        <p>Scans every code change for secrets, vulnerabilities, and misconfigurations the moment they appear.</p>
+        <span class="response-tag fast">⏱ Response: Seconds</span>
+
+        <h4 style="margin-top:16px; font-size:.85rem;">Use Cases Covered</h4>
+        <ul>
+          <li>#5 — Secret Exposure Detection</li>
+          <li>#11 — Vulnerability Fix</li>
+          <li>#6 — IaC Hardening</li>
+          <li>#9 — Policy-as-Code</li>
+        </ul>
+
+        <h4 style="margin-top:12px; font-size:.85rem;">Implementation</h4>
+        <p style="margin-bottom:0;">Standard GitHub Actions with <code>on: push</code> and <code>on: pull_request</code> triggers.</p>
+      </div>
+
+      <!-- Layer 2 -->
+      <div class="card layer-card layer-2">
+        <span class="layer-badge">Layer 2 · Scheduled Scanning</span>
+        <h3>🔄 Periodic Monitoring</h3>
+        <p><strong>Triggered by:</strong> Cron schedule (every 15 min, hourly, daily)</p>
+        <p>Continuous compliance monitoring, drift detection, certificate expiry checks, and network scanning.</p>
+        <span class="response-tag medium">⏱ Response: Minutes</span>
+
+        <h4 style="margin-top:16px; font-size:.85rem;">Use Cases Covered</h4>
+        <ul>
+          <li>#1 — DNS Exfiltration Monitoring</li>
+          <li>#10 — Network Compliance</li>
+          <li>#8 — VPN Audit</li>
+          <li>#7 — WAF &amp; Zero Trust</li>
+        </ul>
+
+        <h4 style="margin-top:12px; font-size:.85rem;">Implementation</h4>
+        <p style="margin-bottom:0;">GitHub Actions with <code>on: schedule</code> — e.g., <code>cron: '*/15 * * * *'</code> for every 15 minutes.</p>
+      </div>
+
+      <!-- Layer 3 -->
+      <div class="card layer-card layer-3">
+        <span class="layer-badge">Layer 3 · AI-Powered</span>
+        <h3>🧠 Intelligent Response</h3>
+        <p><strong>Triggered by:</strong> Findings from Layer 1 &amp; Layer 2</p>
+        <p>Correlates findings, generates KQL queries, produces incident reports, suggests targeted remediations.</p>
+        <span class="response-tag slow">⏱ Response: Minutes–Hours</span>
+
+        <h4 style="margin-top:16px; font-size:.85rem;">Use Cases Covered</h4>
+        <ul>
+          <li>#2 — KQL Investigation</li>
+          <li>#4 — Network Forensics</li>
+          <li>#12 — Incident Report</li>
+          <li>#3 — Firewall Containment</li>
+        </ul>
+
+        <h4 style="margin-top:12px; font-size:.85rem;">Implementation</h4>
+        <p style="margin-bottom:0;">GitHub Copilot Extensions / Custom Copilot Agent that reads findings and generates remediation PRs.</p>
+      </div>
+    </div>
+
+    <!-- Layer 1 Example -->
+    <h3 style="margin-top: 30px;">Layer 1 Example — Push-Triggered Security Scan</h3>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <div class="code-label">push-security-scan.yml</div>
+      <pre><code>name: "🔒 Push Security Scan"
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Scan for hardcoded secrets"
+        run: |
+          # Use trufflehog, gitleaks, or custom patterns
+          python scenarios/05-secret-exposure/simulate.py
+          python scenarios/05-secret-exposure/remediate.py
+      - name: "Block PR if secrets found"
+        if: failure()
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "🚨 **Secrets detected** — this PR cannot be merged."
+
+  iac-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Validate IaC templates"
+        run: |
+          python scenarios/06-iac-hardening/simulate.py
+          python scenarios/06-iac-hardening/remediate.py</code></pre>
+    </div>
+
+    <!-- Layer 2 Example -->
+    <h3>Layer 2 Example — Scheduled Compliance Scan</h3>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <div class="code-label">scheduled-compliance.yml</div>
+      <pre><code>name: "📋 Scheduled Compliance Scan"
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # Every 15 minutes
+  workflow_dispatch:          # Manual trigger
+
+jobs:
+  dns-monitoring:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Check for DNS tunneling activity"
+        run: python scenarios/01-dns-alert/simulate.py
+      - name: "Auto-block suspicious domains"
+        if: failure()
+        run: python scenarios/01-dns-alert/remediate.py
+
+  compliance-drift:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Audit network compliance"
+        run: |
+          python scenarios/10-network-compliance/simulate.py
+          python scenarios/10-network-compliance/remediate.py
+      - name: "Create drift report"
+        if: always()
+        run: |
+          echo "## Compliance Report — $(date)" >> $GITHUB_STEP_SUMMARY
+          cat reports/compliance-status.json | python -m json.tool >> $GITHUB_STEP_SUMMARY</code></pre>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> Use the building security analogy: "Think of it like a building security system. <strong>Layer 1</strong> is the door lock — it catches things at the gate, every time someone pushes code. <strong>Layer 2</strong> is the security patrol — it walks the perimeter regularly, looking for things that weren't there yesterday. <strong>Layer 3</strong> is the security operations center — it watches the cameras, correlates footage, and coordinates the response. You need all three."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 4 — IMPLEMENTATION ═══════════════ -->
+<section id="section-4">
+  <div class="container">
+    <h2><span class="section-number">4</span>Implementation — The Scheduled Security Agent</h2>
+
+    <!-- 4a — Master Workflow -->
+    <h3>4a. The Master Agent Workflow</h3>
+    <p>A single workflow that orchestrates all 12 security checks in parallel using a matrix strategy.</p>
+
+    <div class="collapsible-toggle" onclick="toggleCollapsible(this)">
+      <span class="arrow">▶</span>
+      <span>continuous-security-agent.yml — Full Workflow (click to expand)</span>
+    </div>
+    <div class="collapsible-content">
+      <div class="code-block" style="margin:0;">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        <pre><code>name: "🤖 Continuous Security Agent"
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'        # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Scan scope'
+        type: choice
+        options:
+          - full
+          - quick
+          - critical-only
+        default: full
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+env:
+  REPORT_DIR: reports
+  SEVERITY_THRESHOLD: medium
+
+jobs:
+  # ─── Layer 1: Event-driven checks ───
+  dns-monitoring:
+    name: "🌐 DNS Threat Monitoring"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Run DNS exfiltration analysis"
+        run: |
+          python scenarios/01-dns-alert/simulate.py
+          python scenarios/01-dns-alert/remediate.py
+        continue-on-error: true
+      - name: "Report findings"
+        if: always()
+        run: |
+          echo "### 🌐 DNS Monitoring Results" >> $GITHUB_STEP_SUMMARY
+          echo "Scan completed at $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  kql-investigation:
+    name: "🔍 KQL Threat Investigation"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Generate KQL investigation queries"
+        run: |
+          python scenarios/02-kql-investigation/simulate.py
+          python scenarios/02-kql-investigation/remediate.py
+        continue-on-error: true
+
+  firewall-containment:
+    name: "🧱 Firewall Containment"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Run firewall analysis"
+        run: |
+          python scenarios/03-firewall-containment/simulate.py
+          python scenarios/03-firewall-containment/remediate.py
+        continue-on-error: true
+
+  network-forensics:
+    name: "🔬 Network Forensics"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Perform network forensic analysis"
+        run: |
+          python scenarios/04-network-forensics/simulate.py
+          python scenarios/04-network-forensics/remediate.py
+        continue-on-error: true
+
+  secret-scan:
+    name: "🔑 Secret Exposure Detection"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Scan for exposed secrets"
+        run: |
+          python scenarios/05-secret-exposure/simulate.py
+          python scenarios/05-secret-exposure/remediate.py
+        continue-on-error: true
+      - name: "Create issue for critical secrets"
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🚨 Critical: Exposed secrets detected" \
+            --body "Automated scan found exposed secrets. See workflow run for details." \
+            --label "security,priority:critical,auto-detected"
+
+  iac-hardening:
+    name: "🏗️ IaC Hardening"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Validate infrastructure templates"
+        run: |
+          python scenarios/06-iac-hardening/simulate.py
+          python scenarios/06-iac-hardening/remediate.py
+        continue-on-error: true
+
+  waf-zero-trust:
+    name: "🌐 WAF & Zero Trust"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Audit WAF and Zero Trust policies"
+        run: |
+          python scenarios/07-waf-zero-trust/simulate.py
+          python scenarios/07-waf-zero-trust/remediate.py
+        continue-on-error: true
+
+  vpn-audit:
+    name: "🔒 VPN Configuration Audit"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Audit VPN configurations"
+        run: |
+          python scenarios/08-vpn-audit/simulate.py
+          python scenarios/08-vpn-audit/remediate.py
+        continue-on-error: true
+
+  policy-as-code:
+    name: "📋 Policy-as-Code Validation"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Validate security policies"
+        run: |
+          python scenarios/09-policy-as-code/simulate.py
+          python scenarios/09-policy-as-code/remediate.py
+        continue-on-error: true
+
+  network-compliance:
+    name: "📊 Network Compliance Check"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Run compliance checks"
+        run: |
+          python scenarios/10-network-compliance/simulate.py
+          python scenarios/10-network-compliance/remediate.py
+        continue-on-error: true
+
+  vulnerability-fix:
+    name: "🐛 Vulnerability Remediation"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Scan and fix vulnerabilities"
+        run: |
+          python scenarios/11-vulnerability-fix/simulate.py
+          python scenarios/11-vulnerability-fix/remediate.py
+        continue-on-error: true
+
+  incident-report:
+    name: "📝 Incident Report Generation"
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: "Generate incident reports"
+        run: |
+          python scenarios/12-incident-report/simulate.py
+          python scenarios/12-incident-report/remediate.py
+        continue-on-error: true
+
+  # ─── Consolidated Report ───
+  report:
+    name: "📊 Consolidated Security Report"
+    needs:
+      - dns-monitoring
+      - kql-investigation
+      - firewall-containment
+      - network-forensics
+      - secret-scan
+      - iac-hardening
+      - waf-zero-trust
+      - vpn-audit
+      - policy-as-code
+      - network-compliance
+      - vulnerability-fix
+      - incident-report
+    if: always()
+    runs-on: [self-hosted, security-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Generate consolidated dashboard"
+        run: |
+          echo "# 🛡️ Security Agent Report" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| DNS Monitoring | ${{ needs.dns-monitoring.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| KQL Investigation | ${{ needs.kql-investigation.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Firewall | ${{ needs.firewall-containment.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Forensics | ${{ needs.network-forensics.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IaC Hardening | ${{ needs.iac-hardening.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| WAF/Zero Trust | ${{ needs.waf-zero-trust.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| VPN Audit | ${{ needs.vpn-audit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Policy-as-Code | ${{ needs.policy-as-code.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compliance | ${{ needs.network-compliance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Vulnerability Fix | ${{ needs.vulnerability-fix.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Incident Report | ${{ needs.incident-report.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Create issue for failures"
+        if: contains(needs.*.result, 'failure')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🚨 Security Agent: Findings detected — $(date +%Y-%m-%d)" \
+            --body "One or more security checks reported findings. Review the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." \
+            --label "security,auto-detected"</code></pre>
+      </div>
+    </div>
+
+    <!-- 4b — Self-Hosted Runner -->
+    <h3 style="margin-top: 36px;">4b. Self-Hosted Runner Setup</h3>
+    <p>A persistent runner that keeps the agent always-on.</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Provision a VM</strong>
+        <p>Use an Azure B2s ($~30/month) or any Linux server with Docker support.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Install the GitHub Actions runner</strong>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code># Download and configure
+mkdir actions-runner && cd actions-runner
+curl -o actions-runner-linux-x64.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.311.0/actions-runner-linux-x64-2.311.0.tar.gz
+tar xzf ./actions-runner-linux-x64.tar.gz
+
+# Configure with your repo
+./config.sh --url https://github.com/sautalwar/it-security-copilot-demo \
+            --token YOUR_RUNNER_TOKEN \
+            --labels security-agent \
+            --name security-runner-01</code></pre>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Install as a system service</strong>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code>sudo ./svc.sh install
+sudo ./svc.sh start
+sudo ./svc.sh status   # Verify it's running</code></pre>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <strong>Update workflows to target the runner</strong>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          <pre><code># In your workflow YAML, change:
+runs-on: ubuntu-latest
+# To:
+runs-on: [self-hosted, security-agent]</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <h4 style="margin-top:20px;">Benefits of Self-Hosted Runners</h4>
+    <div class="benefit-grid">
+      <div class="benefit-item"><div class="bi-icon">🔌</div><strong>Always Running</strong>Not ephemeral — maintains persistent state between scans</div>
+      <div class="benefit-item"><div class="bi-icon">🏢</div><strong>Network Access</strong>Can reach internal networks, firewalls, and on-prem systems</div>
+      <div class="benefit-item"><div class="bi-icon">💾</div><strong>State Persistence</strong>Caches scan results for trend analysis and drift detection</div>
+      <div class="benefit-item"><div class="bi-icon">🔧</div><strong>Custom Tooling</strong>Pre-install specialized security tools (Nmap, Trivy, etc.)</div>
+      <div class="benefit-item"><div class="bi-icon">💰</div><strong>Cost-Effective</strong>One VM handles unlimited scans — no per-minute billing</div>
+      <div class="benefit-item"><div class="bi-icon">🏷️</div><strong>Labeled Routing</strong>Route security jobs to dedicated runners with specific capabilities</div>
+    </div>
+
+    <!-- 4c — Auto-Remediation -->
+    <h3 style="margin-top: 36px;">4c. Auto-Remediation with Pull Requests</h3>
+    <p>Automatically generate fixes and open PRs for the security team to review.</p>
+
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <div class="code-label">auto_remediate.py</div>
+      <pre><code>#!/usr/bin/env python3
+"""Auto-remediation: run fix, commit, and open a PR."""
+
+import subprocess
+import json
+from datetime import datetime
+
+def create_remediation_pr(scenario_name: str, scenario_num: int, findings: dict):
+    date_str = datetime.now().strftime("%Y%m%d-%H%M")
+    branch = f"security/auto-fix-{scenario_name}-{date_str}"
+    title = f"🔒 Auto-fix: {scenario_name} ({len(findings.get('issues', []))} findings)"
+
+    # Build PR body from findings
+    body_lines = [
+        f"## 🛡️ Automated Security Remediation",
+        f"**Scenario:** #{scenario_num} — {scenario_name}",
+        f"**Detected:** {datetime.now().isoformat()}",
+        f"**Findings:** {len(findings.get('issues', []))} issues",
+        "",
+        "### Findings",
+    ]
+    for issue in findings.get("issues", []):
+        severity = issue.get("severity", "medium").upper()
+        body_lines.append(f"- **[{severity}]** {issue.get('description', 'N/A')}")
+
+    body_lines += ["", "### Remediation Applied"]
+    for fix in findings.get("fixes", []):
+        body_lines.append(f"- ✅ {fix}")
+
+    body_lines += [
+        "",
+        "---",
+        "*This PR was automatically generated by the Continuous Security Agent.*",
+    ]
+    body = "\n".join(body_lines)
+
+    # Git operations
+    subprocess.run(["git", "checkout", "-b", branch], check=True)
+    subprocess.run(
+        ["python", f"scenarios/{scenario_num:02d}-{scenario_name}/remediate.py"],
+        check=True,
+    )
+    subprocess.run(["git", "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "commit", "-m", f"fix(security): auto-remediate {scenario_name}"],
+        check=True,
+    )
+    subprocess.run(["git", "push", "origin", branch], check=True)
+
+    # Open PR via gh CLI
+    subprocess.run([
+        "gh", "pr", "create",
+        "--title", title,
+        "--body", body,
+        "--label", "security,auto-remediation,priority:high",
+        "--assignee", "@me",
+    ], check=True)
+
+    print(f"✅ PR created on branch {branch}")
+
+
+if __name__ == "__main__":
+    # Example usage — in practice, findings come from the scanner
+    sample_findings = {
+        "issues": [
+            {"severity": "critical", "description": "Hardcoded AWS key in src/config.js"},
+            {"severity": "high", "description": "S3 bucket policy allows public access"},
+        ],
+        "fixes": [
+            "Replaced hardcoded key with environment variable reference",
+            "Updated S3 bucket policy to deny public access",
+        ],
+    }
+    create_remediation_pr("secret-exposure", 5, sample_findings)</code></pre>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> "This is the key differentiator — we're not just detecting, we're automatically generating the fix. The security team doesn't get a JIRA ticket that says 'fix the thing.' They get a pull request with the exact code change, a detailed explanation, severity labels, and a one-click merge button. A PR is 10x easier to deal with than a ticket. And because it goes through the normal code review process, you get an audit trail for free."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 5 — COPILOT EXTENSION ═══════════════ -->
+<section id="section-5">
+  <div class="container">
+    <h2><span class="section-number">5</span>Building a Custom Copilot Extension (Advanced)</h2>
+
+    <div class="card">
+      <h3>What is a Copilot Extension?</h3>
+      <ul>
+        <li>A custom agent that lives inside <strong>GitHub Copilot Chat</strong></li>
+        <li>Users <code>@mention</code> it: <code>@security-agent analyze the latest scan results</code></li>
+        <li>Has access to repo context and can read security findings, workflow artifacts, and issue history</li>
+        <li>Can trigger remediation workflows and create PRs via the GitHub API</li>
+      </ul>
+    </div>
+
+    <h3 style="margin-top:24px;">Extension Architecture</h3>
+    <div class="flow-row">
+      <div class="flow-box">💬 Copilot Chat</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box blue">🔌 Webhook</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box purple">🧠 AI Analysis</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-box green">🔧 GitHub API</div>
+    </div>
+    <p style="text-align:center; color:var(--text-dim); font-size:.82rem; margin-top:8px;">Backend: Node.js or Python server hosted on Azure / GitHub Codespaces</p>
+
+    <h3 style="margin-top:28px;">Example Interaction</h3>
+    <div class="chat-window">
+      <div class="chat-msg">
+        <div class="chat-avatar user">U</div>
+        <div class="chat-bubble"><code>@security-agent</code> what's our current security posture?</div>
+      </div>
+      <div class="chat-msg">
+        <div class="chat-avatar agent">🛡</div>
+        <div class="chat-bubble">
+          Based on the last scan <em>(2 hours ago)</em>:<br><br>
+          <span class="status-ok">✅ DNS monitoring:</span> Clean — no C2 traffic detected<br>
+          <span class="status-warn">⚠️ Compliance:</span> 2 controls drifted (CIS 5.2.1, 5.2.3)<br>
+          <span class="status-err">❌ Secrets:</span> 1 new hardcoded API key found in <code>src/config.js</code><br><br>
+          I've created <strong>PR #47</strong> to fix the hardcoded key.<br>
+          Compliance drift remediation is in <strong>PR #48</strong>.
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Implementation Steps</h3>
+    <ol>
+      <li><strong>Create a GitHub App</strong> with Copilot Extension capabilities</li>
+      <li><strong>Build a webhook endpoint</strong> that handles Copilot Chat messages</li>
+      <li><strong>Parse user queries</strong> using intent detection (keywords or LLM-based)</li>
+      <li><strong>Query the repo</strong> for latest security scan results (JSON artifacts, workflow runs)</li>
+      <li><strong>Generate AI-powered responses</strong> with remediation suggestions</li>
+      <li><strong>Optionally trigger workflows</strong> or create PRs via the GitHub API</li>
+    </ol>
+
+    <h3 style="margin-top:28px;">Webhook Handler Skeleton</h3>
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <div class="code-label">server.js — Copilot Extension webhook</div>
+      <pre><code>const express = require("express");
+const { Octokit } = require("@octokit/rest");
+
+const app = express();
+app.use(express.json());
+
+const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+
+app.post("/copilot/webhook", async (req, res) => {
+  const { messages, copilot_references } = req.body;
+  const userMessage = messages[messages.length - 1]?.content || "";
+  const repo = copilot_references?.find(r => r.type === "repository");
+
+  // ── Intent: Security posture / status ──
+  if (/posture|status|overview|summary/i.test(userMessage)) {
+    const findings = await getLatestScanResults(repo);
+    const summary = generateSecuritySummary(findings);
+    return res.json({
+      messages: [{ role: "assistant", content: summary }],
+    });
+  }
+
+  // ── Intent: Remediate / fix ──
+  if (/remediate|fix|resolve|patch/i.test(userMessage)) {
+    const pr = await triggerRemediation(repo, userMessage);
+    return res.json({
+      messages: [{
+        role: "assistant",
+        content: `✅ Created remediation PR #${pr.number}: ${pr.html_url}`,
+      }],
+    });
+  }
+
+  // ── Intent: Investigate ──
+  if (/investigate|analyze|kql|query/i.test(userMessage)) {
+    const kqlQueries = generateKQLQueries(userMessage);
+    return res.json({
+      messages: [{
+        role: "assistant",
+        content: `Here are KQL queries to investigate:\n\`\`\`kql\n${kqlQueries}\n\`\`\``,
+      }],
+    });
+  }
+
+  // Default response
+  return res.json({
+    messages: [{
+      role: "assistant",
+      content: "I can help with: security posture, remediation, investigation, and compliance reports. What would you like to know?",
+    }],
+  });
+});
+
+async function getLatestScanResults(repo) {
+  // Fetch the latest workflow run artifacts
+  const { data: runs } = await octokit.actions.listWorkflowRuns({
+    owner: repo.owner, repo: repo.name,
+    workflow_id: "continuous-security-agent.yml",
+    per_page: 1,
+  });
+  // Parse findings from the run...
+  return runs.workflow_runs[0];
+}
+
+async function triggerRemediation(repo, message) {
+  // Create a workflow dispatch to trigger remediation
+  await octokit.actions.createWorkflowDispatch({
+    owner: repo.owner, repo: repo.name,
+    workflow_id: "continuous-security-agent.yml",
+    ref: "main",
+    inputs: { scope: "critical-only" },
+  });
+  return { number: 47, html_url: `https://github.com/${repo.owner}/${repo.name}/pull/47` };
+}
+
+function generateKQLQueries(message) {
+  return `SecurityEvent
+| where TimeGenerated > ago(24h)
+| where EventID in (4624, 4625, 4648)
+| summarize Count=count() by Account, Computer, EventID
+| where Count > 100
+| order by Count desc`;
+}
+
+function generateSecuritySummary(latestRun) {
+  return [
+    "## 🛡️ Security Posture Summary\n",
+    "✅ **DNS Monitoring:** Clean — no C2 traffic",
+    "⚠️ **Compliance:** 2 controls drifted",
+    "❌ **Secrets:** 1 hardcoded key found\n",
+    `Last scan: ${latestRun?.created_at || "N/A"}`,
+  ].join("\n");
+}
+
+app.listen(3000, () => console.log("Security agent listening on :3000"));</code></pre>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> "This is where GitHub Copilot becomes your security co-pilot — literally. Instead of training your team on 15 different security tools, they just ask Copilot. 'What's our posture?' 'Fix that vulnerability.' 'Generate a compliance report for the board.' One interface, full security coverage. And because it's a Copilot Extension, it lives right inside the IDE and GitHub.com — no context switching."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 6 — MAPPING TABLE ═══════════════ -->
+<section id="section-6">
+  <div class="container">
+    <h2><span class="section-number">6</span>Mapping Use Cases to Agent Capabilities</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Use Case</th>
+            <th>Layer</th>
+            <th>Frequency</th>
+            <th>Trigger</th>
+            <th>Auto-Fix Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>DNS Exfiltration Detection</td>
+            <td><span class="tag-layer2">Layer 2</span></td>
+            <td>Every 15 min</td>
+            <td><code>schedule</code></td>
+            <td>Block domain + alert</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>KQL Threat Investigation</td>
+            <td><span class="tag-layer3">Layer 3</span></td>
+            <td>On finding</td>
+            <td><code>issue / alert</code></td>
+            <td>Generate queries</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Firewall Containment</td>
+            <td class="tag-layer12"><span class="l1">L1</span> + <span class="l3">L3</span></td>
+            <td>On push + alert</td>
+            <td><code>push / dispatch</code></td>
+            <td>Deploy rules</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Network Forensics</td>
+            <td><span class="tag-layer3">Layer 3</span></td>
+            <td>On incident</td>
+            <td><code>manual</code></td>
+            <td>Generate report</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Secret Exposure</td>
+            <td><span class="tag-layer1">Layer 1</span></td>
+            <td>Every push</td>
+            <td><code>push / PR</code></td>
+            <td>Rotate + PR</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>IaC Hardening</td>
+            <td><span class="tag-layer1">Layer 1</span></td>
+            <td>Every push</td>
+            <td><code>push / PR</code></td>
+            <td>Harden + PR</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>WAF &amp; Zero Trust</td>
+            <td><span class="tag-layer2">Layer 2</span></td>
+            <td>Daily</td>
+            <td><code>schedule</code></td>
+            <td>Update rules</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>VPN Audit</td>
+            <td><span class="tag-layer2">Layer 2</span></td>
+            <td>Daily</td>
+            <td><code>schedule</code></td>
+            <td>Alert + report</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>Policy-as-Code</td>
+            <td><span class="tag-layer1">Layer 1</span></td>
+            <td>Every push</td>
+            <td><code>push / PR</code></td>
+            <td>Block deploy</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td>Network Compliance</td>
+            <td><span class="tag-layer2">Layer 2</span></td>
+            <td>Every 6 hours</td>
+            <td><code>schedule</code></td>
+            <td>Report + PR</td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td>Vulnerability Fix</td>
+            <td><span class="tag-layer1">Layer 1</span></td>
+            <td>Every push/PR</td>
+            <td><code>push / PR</code></td>
+            <td>Fix + PR</td>
+          </tr>
+          <tr>
+            <td>12</td>
+            <td>Incident Report</td>
+            <td><span class="tag-layer3">Layer 3</span></td>
+            <td>On incident</td>
+            <td><code>dispatch</code></td>
+            <td>Generate report</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> Walk through the table row by row. "Notice the pattern: <strong>Layer 1</strong> catches everything at commit time — this is shift-left security at its best. Every push, every PR gets scanned. <strong>Layer 2</strong> catches drift — things that were fine yesterday but aren't today. A certificate expired, a compliance control changed, a new DNS pattern appeared. <strong>Layer 3</strong> is the brain — it correlates everything, generates investigation queries, and produces the reports that executives and auditors need. Together, all three layers provide complete coverage."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 7 — DEMO ═══════════════ -->
+<section id="section-7">
+  <div class="container">
+    <h2><span class="section-number">7</span>Demo — Seeing It In Action</h2>
+
+    <p>Follow these steps to demonstrate the continuous security agent live:</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>"Let me show you the agent running"</strong>
+        <p>Open <strong>GitHub Actions</strong> → Show the <code>🤖 Continuous Security Agent</code> workflow. Point out the schedule and the parallel job matrix.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>"Here's what happens when someone pushes vulnerable code"</strong>
+        <p>Make a commit that includes a hardcoded API key. Show the push-triggered workflow firing within seconds.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>"The agent detected the issue and created a PR"</strong>
+        <p>Navigate to the <strong>Pull Requests</strong> tab. Show the auto-generated PR with severity labels, the detailed finding report in the PR body, and the exact code fix in the diff.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <strong>"Now let's ask the Copilot Extension"</strong>
+        <p>Open Copilot Chat, type <code>@security-agent what's our current security posture?</code> — show the live response with status across all 12 checks.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <strong>"And here's the security dashboard"</strong>
+        <p>Open the latest workflow run's <strong>Summary</strong> tab. Show the consolidated report table with pass/fail for all 12 scenarios.</p>
+      </div>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> This is the climax of the presentation. Every step should feel seamless. Practice the commit + trigger cycle beforehand so the workflow fires immediately. Have the PR pre-staged if timing is tight. The Copilot Extension demo is optional but very impactful — if you have it deployed, use it. If not, show the chat mockup and explain the architecture. Close with: "Everything you just saw is running on GitHub infrastructure. No third-party vendor lock-in, no per-seat security tool licenses, no on-call rotation for routine scans."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 8 — COST ═══════════════ -->
+<section id="section-8">
+  <div class="container">
+    <h2><span class="section-number">8</span>Cost &amp; Scalability</h2>
+
+    <div class="cost-grid">
+      <div class="cost-card">
+        <div style="font-size:1.4rem;">🏃 GitHub-Hosted</div>
+        <div class="price">Free*</div>
+        <div class="price-label">2,000 min/month (public)<br>500 min/month (private)</div>
+      </div>
+      <div class="cost-card">
+        <div style="font-size:1.4rem;">🖥️ Self-Hosted Runner</div>
+        <div class="price">$0</div>
+        <div class="price-label">Runner is free<br>You pay for the VM only</div>
+      </div>
+      <div class="cost-card">
+        <div style="font-size:1.4rem;">☁️ Azure VM (B2s)</div>
+        <div class="price">~$30</div>
+        <div class="price-label">Per month<br>Adequate for all 12 scans</div>
+      </div>
+      <div class="cost-card">
+        <div style="font-size:1.4rem;">🏢 Enterprise</div>
+        <div class="price">Unlimited</div>
+        <div class="price-label">GHEC includes unlimited<br>self-hosted runner minutes</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h3>⚡ Performance</h3>
+      <ul>
+        <li><strong>Parallel execution:</strong> Matrix strategy runs all 12 checks simultaneously</li>
+        <li><strong>Total scan time:</strong> ~3 minutes for a full security sweep</li>
+        <li><strong>Frequency:</strong> Every 6 hours = 4 scans/day = 28 scans/week</li>
+        <li><strong>Coverage:</strong> Every push + every PR + 4 scheduled scans daily = near-continuous monitoring</li>
+      </ul>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> "Let's talk ROI. A SOC analyst costs $120K–$180K per year. This agent costs $30/month — $360/year — and it never sleeps, never takes PTO, never misses an alert. It doesn't <em>replace</em> the analyst — it handles the routine so the analyst can focus on the sophisticated, novel threats that actually require human judgment. And because it runs on GitHub infrastructure you already pay for, there's no new vendor to onboard, no new contract to negotiate, no new tool to train on."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SECTION 9 — GETTING STARTED ═══════════════ -->
+<section id="section-9">
+  <div class="container">
+    <h2><span class="section-number">9</span>Getting Started — Quick Start</h2>
+
+    <div class="code-block">
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+      <div class="code-label">Terminal — Setup in 5 minutes</div>
+      <pre><code># 1. Clone the repository
+git clone https://github.com/sautalwar/it-security-copilot-demo
+cd it-security-copilot-demo
+
+# 2. Enable the scheduled workflow
+#    GitHub disables scheduled workflows on forks — enable it in:
+#    Settings → Actions → General → Allow all actions
+
+# 3. (Optional) Set up a self-hosted runner
+#    Settings → Actions → Runners → "New self-hosted runner"
+#    Follow the on-screen instructions to install and configure
+
+# 4. (Optional) Configure notifications
+#    Add these secrets in Settings → Secrets → Actions:
+#    - SLACK_WEBHOOK_URL    → for Slack notifications
+#    - TEAMS_WEBHOOK_URL    → for Microsoft Teams notifications
+
+# 5. Run the first scan manually
+gh workflow run continuous-security-agent.yml --field scope=full
+
+# 6. Check results
+gh run list --workflow=continuous-security-agent.yml --limit 1
+gh run view &lt;run-id&gt;</code></pre>
+    </div>
+
+    <div class="card" style="border-color: var(--green);">
+      <h3>✅ Checklist</h3>
+      <ul style="list-style: none; margin-left: 0; padding-left: 0;">
+        <li>☐ Repository cloned and Actions enabled</li>
+        <li>☐ Python 3.11+ available on runner</li>
+        <li>☐ <code>GITHUB_TOKEN</code> permissions: <code>contents: write</code>, <code>issues: write</code>, <code>pull-requests: write</code></li>
+        <li>☐ (Optional) Self-hosted runner labeled <code>security-agent</code></li>
+        <li>☐ (Optional) Notification webhooks configured</li>
+        <li>☐ First manual scan completed successfully</li>
+        <li>☐ (Optional) Copilot Extension deployed and registered</li>
+      </ul>
+    </div>
+
+    <div class="notes">
+      <strong>🎤 Presenter Notes:</strong> "You can be up and running in under five minutes with GitHub-hosted runners. The self-hosted runner adds another 10 minutes of setup. And the Copilot Extension is a weekend project for an experienced developer. The barrier to entry is intentionally low — we want security teams to be able to adopt this without a six-month implementation timeline."
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer>
+  <div class="container">
+    <div class="copilot-badge"><span class="dot"></span> Built with GitHub Copilot</div>
+    <p>Continuous Security Agent — Always-On Protection with GitHub</p>
+    <div class="footer-links">
+      <a href="https://github.com/sautalwar/it-security-copilot-demo">📂 Repository</a>
+      <a href="demo.html">🖥️ Demo Dashboard</a>
+      <a href="https://docs.github.com/en/actions">📖 GitHub Actions Docs</a>
+      <a href="https://docs.github.com/en/copilot/building-copilot-extensions">🧩 Copilot Extensions</a>
+    </div>
+    <p style="margin-top: 18px; font-size: .72rem; color: var(--text-dim);">
+      Press <kbd style="background:var(--border);padding:1px 6px;border-radius:3px;font-family:monospace;">N</kbd> to toggle presenter notes &nbsp;·&nbsp;
+      Keys <kbd style="background:var(--border);padding:1px 6px;border-radius:3px;font-family:monospace;">1</kbd>–<kbd style="background:var(--border);padding:1px 6px;border-radius:3px;font-family:monospace;">9</kbd> jump to sections
+    </p>
+  </div>
+</footer>
+
+<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<script>
+(function () {
+  "use strict";
+
+  /* ── Notes Toggle ── */
+  document.addEventListener("keydown", function (e) {
+    // N key toggles notes
+    if (e.key === "n" || e.key === "N") {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      e.preventDefault();
+      document.body.classList.toggle("show-notes");
+    }
+
+    // Number keys 1-9 jump to sections
+    if (/^[1-9]$/.test(e.key)) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      var sec = document.getElementById("section-" + e.key);
+      if (sec) {
+        e.preventDefault();
+        sec.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  });
+
+  /* ── Copy button ── */
+  window.copyCode = function (btn) {
+    var block = btn.closest(".code-block") || btn.closest(".collapsible-content");
+    var pre = block ? block.querySelector("pre") : null;
+    if (!pre) return;
+    var text = pre.textContent || pre.innerText;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+      setTimeout(function () {
+        btn.textContent = "Copy";
+        btn.classList.remove("copied");
+      }, 2000);
+    }).catch(function () {
+      // Fallback for older browsers
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (_) { /* noop */ }
+      document.body.removeChild(ta);
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+      setTimeout(function () {
+        btn.textContent = "Copy";
+        btn.classList.remove("copied");
+      }, 2000);
+    });
+  };
+
+  /* ── Collapsible sections ── */
+  window.toggleCollapsible = function (toggle) {
+    var content = toggle.nextElementSibling;
+    if (!content) return;
+    var isOpen = content.classList.contains("show");
+    content.classList.toggle("show");
+    toggle.classList.toggle("open");
+  };
+
+  /* ── Smooth scroll for anchor links ── */
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      var target = document.querySelector(this.getAttribute("href"));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
