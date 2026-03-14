@@ -1,0 +1,36 @@
+======================================================================
+  DNS EXFILTRATION — SECURITY REPORT
+  Generated: 2026-03-14T18:13:08.835815Z
+======================================================================
+
+Total queries analysed : 255
+Unique source IPs      : 5
+
+[!] C2 domain queries        : 115
+[!] High-entropy subdomains  : 115
+[!] TXT exfil queries        : 32
+[!] Rate-burst detections    : 1
+
+--- Rate-burst details ---
+  IP 10.0.1.15  2025-01-15T09:30  (56 queries)
+
+--- Sample C2 queries (first 10) ---
+  2025-01-15T09:00:10Z  10.0.1.15  A  a21ibhflexjkdjhtves2dxpftmdtvwtrsa.evil-c2.example.com
+  2025-01-15T09:01:07Z  10.0.1.15  A  yvfxwdrovu9vowltwnpualq.evil-c2.example.com
+  2025-01-15T09:03:20Z  10.0.1.15  A  mw5tzgo0nhloee9fegzlvhdmyg.evil-c2.example.com
+  2025-01-15T09:04:08Z  10.0.1.15  TXT  dfm2m25qt0nhs0rprmy1wkjrqwl5rfz1nnrynko0d282ejfxbglazw.evil-c2.example.com
+  2025-01-15T09:04:45Z  10.0.1.15  A  nuhwbxhzwgtuc3c2qwrrea.evil-c2.example.com
+  2025-01-15T09:06:45Z  10.0.1.15  A  wxnkvlh3v0ndwdc2q05yvm9noe9oelhiy1e1sxcwuzrj.evil-c2.example.com
+  2025-01-15T09:06:49Z  10.0.1.15  TXT  qmnavtmxrxlqvu5uu0vubudfsmpqoui4zhzoclvsq092vkdvdko.evil-c2.example.com
+  2025-01-15T09:07:54Z  10.0.1.15  A  vwx6mhrdq2o5u01bcwfoohhuanrvz2vndujv.evil-c2.example.com
+  2025-01-15T09:09:17Z  10.0.1.15  TXT  c2lkstcxbjawexprvjrwshd6cnjzmmvxm0pnotllrmi.evil-c2.example.com
+  2025-01-15T09:09:45Z  10.0.1.15  A  we1lmut1rdcxuxfhqmxnsnrusdrvm2o.evil-c2.example.com
+
+--- Recommendations ---
+  1. Block evil-c2.example.com at DNS and firewall level.
+  2. Isolate host 10.0.1.15 for forensic investigation.
+  3. Enable DNS query logging on all resolvers.
+  4. Deploy entropy-based tunneling detection.
+  5. Restrict outbound DNS to approved resolvers only.
+
+======================================================================
