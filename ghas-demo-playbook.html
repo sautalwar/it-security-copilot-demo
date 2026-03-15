@@ -658,6 +658,270 @@ body.show-notes .presenter-notes { display: block; }
       Security findings appear exactly where developers already work &mdash; in the pull request.
     </div>
 
+    <!-- Dependency Graph Explainer (Visible) -->
+    <div style="margin-top:24px;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;">
+      <h3 style="color:#58a6ff;margin:0 0 16px;">&#128202; How Dependency Graph Works</h3>
+      <p style="color:#e6edf3;">The Dependency Graph <strong>reads your manifest files</strong> (pom.xml, package.json, requirements.txt, etc.) checked into the repo. It does NOT connect to any registry &mdash; it's a file parser that extracts package names and versions to build a complete dependency map.</p>
+
+      <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;background:#0d1117;border:1px solid #238636;border-radius:8px;padding:14px;">
+          <div style="color:#3fb950;font-weight:bold;margin-bottom:6px;">&#9989; Public Packages</div>
+          <div style="color:#8b949e;font-size:14px;">Detected automatically from standard manifests. CVE alerts from GitHub Advisory Database (200K+ advisories). Dependabot auto-generates fix PRs.</div>
+        </div>
+        <div style="flex:1;min-width:200px;background:#0d1117;border:1px solid #d29922;border-radius:8px;padding:14px;">
+          <div style="color:#d29922;font-weight:bold;margin-bottom:6px;">&#9888; Internal/Private Packages</div>
+          <div style="color:#8b949e;font-size:14px;">Also detected automatically from manifests. CVE alerts need private advisories. Auto-update PRs need registry config in <code style="color:#e6edf3;">dependabot.yml</code>.</div>
+        </div>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Supported Ecosystems (Out of the Box)</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">npm</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">PyPI</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">Maven</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">NuGet</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">RubyGems</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">Go Modules</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">Cargo (Rust)</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">Composer (PHP)</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">Gradle</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">pub (Dart)</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">Hex (Elixir)</span>
+        <span style="background:#21262d;color:#e6edf3;padding:4px 10px;border-radius:12px;font-size:13px;">GitHub Actions</span>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Example: Internal Maven Dependency</h4>
+      <p style="color:#8b949e;font-size:14px;">Both public and private dependencies are detected from the same pom.xml:</p>
+      <pre style="background:#0d1117;padding:14px;border-radius:6px;overflow-x:auto;font-size:13px;color:#e6edf3;margin:8px 0;border:1px solid #30363d;"><code>&lt;dependencies&gt;
+  &lt;!-- Public: detected + CVE alerts + auto-update PRs --&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+    &lt;version&gt;3.2.0&lt;/version&gt;
+  &lt;/dependency&gt;
+
+  &lt;!-- Internal: detected in graph, needs config for auto-updates --&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt;com.contoso.internal&lt;/groupId&gt;
+    &lt;artifactId&gt;auth-library&lt;/artifactId&gt;
+    &lt;version&gt;2.4.1&lt;/version&gt;
+  &lt;/dependency&gt;
+&lt;/dependencies&gt;</code></pre>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Configuring Private Registries for Dependabot</h4>
+      <p style="color:#8b949e;font-size:14px;">Add a <code style="color:#e6edf3;">.github/dependabot.yml</code> to enable auto-update PRs from your private registry:</p>
+
+      <div style="display:flex;gap:12px;margin:12px 0;flex-wrap:wrap;">
+        <div style="flex:1;min-width:280px;">
+          <div style="color:#58a6ff;font-weight:bold;font-size:13px;margin-bottom:4px;">Nexus / Sonatype</div>
+          <pre style="background:#0d1117;padding:10px;border-radius:6px;font-size:12px;color:#e6edf3;border:1px solid #30363d;margin:0;"><code>registries:
+  contoso-nexus:
+    type: maven-repository
+    url: https://nexus.contoso.internal/
+         repository/maven-releases/
+    username: ${{secrets.NEXUS_USER}}
+    password: ${{secrets.NEXUS_PASS}}</code></pre>
+        </div>
+        <div style="flex:1;min-width:280px;">
+          <div style="color:#58a6ff;font-weight:bold;font-size:13px;margin-bottom:4px;">Azure Artifacts</div>
+          <pre style="background:#0d1117;padding:10px;border-radius:6px;font-size:12px;color:#e6edf3;border:1px solid #30363d;margin:0;"><code>registries:
+  azure-artifacts:
+    type: maven-repository
+    url: https://pkgs.dev.azure.com/
+         contoso/_packaging/
+         internal/maven/v1
+    username: azure
+    password: ${{secrets.AZ_PAT}}</code></pre>
+        </div>
+        <div style="flex:1;min-width:280px;">
+          <div style="color:#58a6ff;font-weight:bold;font-size:13px;margin-bottom:4px;">JFrog Artifactory</div>
+          <pre style="background:#0d1117;padding:10px;border-radius:6px;font-size:12px;color:#e6edf3;border:1px solid #30363d;margin:0;"><code>registries:
+  jfrog:
+    type: maven-repository
+    url: https://contoso.jfrog.io/
+         artifactory/libs-release/
+    username: ${{secrets.JFROG_USER}}
+    password: ${{secrets.JFROG_KEY}}</code></pre>
+        </div>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Private Registry Behind a Firewall?</h4>
+      <div style="background:#0d1117;border:1px solid #d29922;border-radius:8px;padding:14px;">
+        <p style="color:#d29922;font-weight:bold;margin:0 0 8px;">Use Self-Hosted Runners + Dependabot on Self-Hosted Runners</p>
+        <ol style="color:#e6edf3;margin:0;padding-left:20px;font-size:14px;">
+          <li>Deploy a self-hosted runner inside the same VNet as your Nexus/Artifactory</li>
+          <li>Enable <strong>"Dependabot on self-hosted runners"</strong> in org settings</li>
+          <li>Dependabot jobs run on YOUR runner &mdash; can reach internal registries</li>
+          <li>No need to expose your private registry to the internet</li>
+        </ol>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">The Full Picture</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="text-align:left;padding:8px;color:#58a6ff;">Capability</th>
+          <th style="text-align:left;padding:8px;color:#3fb950;">Public Packages</th>
+          <th style="text-align:left;padding:8px;color:#d29922;">Internal Packages</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">Visibility in Dependency Graph</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; Automatic</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; Automatic</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">CVE/Vulnerability Alerts</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; GitHub Advisory DB</td>
+          <td style="padding:8px;color:#d29922;">&#9888; Create private advisories</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">Dependabot Auto-Update PRs</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; From public registries</td>
+          <td style="padding:8px;color:#d29922;">&#9888; Add registry in dependabot.yml</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#e6edf3;">Transitive Dependencies</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; From lock files</td>
+          <td style="padding:8px;color:#d29922;">&#9888; Use Submission API or self-hosted runner</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- CodeQL Explainer (Visible) -->
+    <div style="margin-top:24px;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;">
+      <h3 style="color:#58a6ff;margin:0 0 16px;">&#128269; How CodeQL Works</h3>
+      <p style="color:#e6edf3;">CodeQL is a <strong>semantic code analysis engine</strong> &mdash; not a pattern matcher. It compiles your source code into a queryable database, then runs security queries against it to trace data from user input to dangerous operations.</p>
+
+      <div style="display:flex;gap:16px;margin:16px 0;flex-wrap:wrap;">
+        <div style="flex:1;min-width:150px;text-align:center;background:#0d1117;border-radius:8px;padding:14px;border:1px solid #30363d;">
+          <div style="font-size:28px;">&#128190;</div>
+          <div style="color:#58a6ff;font-weight:bold;margin:6px 0;">1. Build</div>
+          <div style="color:#8b949e;font-size:13px;">Compiles source into a relational database capturing AST, data flow, and type info</div>
+        </div>
+        <div style="display:flex;align-items:center;color:#30363d;font-size:24px;">&rarr;</div>
+        <div style="flex:1;min-width:150px;text-align:center;background:#0d1117;border-radius:8px;padding:14px;border:1px solid #30363d;">
+          <div style="font-size:28px;">&#128270;</div>
+          <div style="color:#58a6ff;font-weight:bold;margin:6px 0;">2. Analyze</div>
+          <div style="color:#8b949e;font-size:13px;">Runs 300+ security queries tracing data flow from sources to sinks</div>
+        </div>
+        <div style="display:flex;align-items:center;color:#30363d;font-size:24px;">&rarr;</div>
+        <div style="flex:1;min-width:150px;text-align:center;background:#0d1117;border-radius:8px;padding:14px;border:1px solid #30363d;">
+          <div style="font-size:28px;">&#128680;</div>
+          <div style="color:#58a6ff;font-weight:bold;margin:6px 0;">3. Report</div>
+          <div style="color:#8b949e;font-size:13px;">Alerts with exact file/line, data flow path, severity, CWE classification</div>
+        </div>
+        <div style="display:flex;align-items:center;color:#30363d;font-size:24px;">&rarr;</div>
+        <div style="flex:1;min-width:150px;text-align:center;background:#0d1117;border-radius:8px;padding:14px;border:1px solid #238636;">
+          <div style="font-size:28px;">&#129302;</div>
+          <div style="color:#3fb950;font-weight:bold;margin:6px 0;">4. Autofix</div>
+          <div style="color:#8b949e;font-size:13px;">Copilot generates the fix code &mdash; one click to create a PR</div>
+        </div>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Supported Languages</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">C / C++</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">C#</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">Go</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">Java / Kotlin</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">JavaScript / TypeScript</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">Python</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">Ruby</span>
+        <span style="background:#238636;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">Swift</span>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">CodeQL vs. Competition</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr style="border-bottom:1px solid #30363d;">
+          <th style="text-align:left;padding:8px;color:#58a6ff;">Feature</th>
+          <th style="text-align:left;padding:8px;color:#3fb950;">CodeQL</th>
+          <th style="text-align:left;padding:8px;color:#8b949e;">SonarQube</th>
+          <th style="text-align:left;padding:8px;color:#8b949e;">Checkmarx</th>
+          <th style="text-align:left;padding:8px;color:#8b949e;">Fortify</th>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">Analysis Type</td>
+          <td style="padding:8px;color:#3fb950;">Semantic (database queries)</td>
+          <td style="padding:8px;color:#8b949e;">Pattern matching</td>
+          <td style="padding:8px;color:#8b949e;">Taint analysis</td>
+          <td style="padding:8px;color:#8b949e;">Taint analysis</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">Query Transparency</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; Open source queries</td>
+          <td style="padding:8px;color:#d29922;">Partial</td>
+          <td style="padding:8px;color:#f85149;">&#10060; Proprietary</td>
+          <td style="padding:8px;color:#f85149;">&#10060; Proprietary</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">AI Auto-Fix</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; Copilot Autofix</td>
+          <td style="padding:8px;color:#f85149;">&#10060; No</td>
+          <td style="padding:8px;color:#f85149;">&#10060; No</td>
+          <td style="padding:8px;color:#f85149;">&#10060; No</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">Setup Time</td>
+          <td style="padding:8px;color:#3fb950;">1 click (default setup)</td>
+          <td style="padding:8px;color:#d29922;">Hours (server deploy)</td>
+          <td style="padding:8px;color:#f85149;">Days (onboarding)</td>
+          <td style="padding:8px;color:#f85149;">Days (license + server)</td>
+        </tr>
+        <tr style="border-bottom:1px solid #21262d;">
+          <td style="padding:8px;color:#e6edf3;">PR Integration</td>
+          <td style="padding:8px;color:#3fb950;">&#9989; Native in PR diff</td>
+          <td style="padding:8px;color:#d29922;">Via plugin</td>
+          <td style="padding:8px;color:#d29922;">Via plugin</td>
+          <td style="padding:8px;color:#d29922;">Via plugin</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;color:#e6edf3;">Cost (Public Repos)</td>
+          <td style="padding:8px;color:#3fb950;">Free</td>
+          <td style="padding:8px;color:#d29922;">Community (limited)</td>
+          <td style="padding:8px;color:#f85149;">Paid only</td>
+          <td style="padding:8px;color:#f85149;">Paid only</td>
+        </tr>
+      </table>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Self-Hosted Runners for CodeQL</h4>
+      <div style="display:flex;gap:12px;margin:12px 0;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;background:#0d1117;border-radius:8px;padding:14px;border:1px solid #30363d;">
+          <div style="color:#58a6ff;font-weight:bold;margin-bottom:6px;">&#127968; When to Use</div>
+          <ul style="color:#8b949e;font-size:13px;margin:0;padding-left:16px;">
+            <li>Large codebases (1M+ lines) needing 16-32GB RAM</li>
+            <li>Build requires proprietary SDKs or licensed compilers</li>
+            <li>Air-gapped / FedRAMP / ITAR regulated environments</li>
+            <li>Faster analysis with warm caches</li>
+          </ul>
+        </div>
+        <div style="flex:1;min-width:200px;background:#0d1117;border-radius:8px;padding:14px;border:1px solid #30363d;">
+          <div style="color:#58a6ff;font-weight:bold;margin-bottom:6px;">&#9889; Azure Setup</div>
+          <ul style="color:#8b949e;font-size:13px;margin:0;padding-left:16px;">
+            <li>GitHub larger runners (Azure-backed, 8-64 cores)</li>
+            <li>Or Azure VM Scale Sets as self-hosted runners</li>
+            <li>Pre-install CodeQL CLI bundle on runner image</li>
+            <li>Label: <code style="color:#e6edf3;">runs-on: [self-hosted, codeql]</code></li>
+          </ul>
+        </div>
+      </div>
+
+      <h4 style="color:#e6edf3;margin:20px 0 10px;">Custom Queries for Your Organization</h4>
+      <p style="color:#8b949e;font-size:14px;">Beyond the 300+ built-in queries, your security team can write custom QL queries for org-specific patterns:</p>
+      <div style="display:flex;gap:12px;margin:8px 0;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;background:#0d1117;border-radius:8px;padding:12px;border:1px solid #30363d;">
+          <div style="color:#bc8cff;font-weight:bold;font-size:13px;">Query Packs</div>
+          <div style="color:#8b949e;font-size:12px;">Write QL queries for patterns like "our internal auth library must be called before DB access"</div>
+        </div>
+        <div style="flex:1;min-width:220px;background:#0d1117;border-radius:8px;padding:12px;border:1px solid #30363d;">
+          <div style="color:#bc8cff;font-weight:bold;font-size:13px;">Model Packs</div>
+          <div style="color:#8b949e;font-size:12px;">Teach CodeQL about your frameworks &mdash; define which methods are "sources" and "sinks"</div>
+        </div>
+        <div style="flex:1;min-width:220px;background:#0d1117;border-radius:8px;padding:12px;border:1px solid #30363d;">
+          <div style="color:#bc8cff;font-weight:bold;font-size:13px;">SARIF Export</div>
+          <div style="color:#8b949e;font-size:12px;">Export results to any SIEM/GRC tool (Splunk, ServiceNow, Archer) via standard SARIF format</div>
+        </div>
+      </div>
+    </div>
+
     <div class="presenter-notes">
       <div class="notes-label">&#127908; Presenter Notes</div>
 
