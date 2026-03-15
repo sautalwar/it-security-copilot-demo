@@ -660,11 +660,61 @@ body.show-notes .presenter-notes { display: block; }
 
     <div class="presenter-notes">
       <div class="notes-label">&#127908; Presenter Notes</div>
-      This is the "aha" moment for many customers. They think security tooling takes weeks to set up.
-      GHAS takes 2 minutes. And it's not just checkboxes &mdash; each of these is a sophisticated engine.
-      CodeQL understands your code semantically &mdash; it's not grep, it's a query language that models data flow.
-      Secret scanning has 200+ patterns from providers like AWS, Azure, Slack, Stripe.
-      Push protection is the only tool that blocks secrets BEFORE they enter the repo.
+
+      <p>This is the "aha" moment for many customers. They think security tooling takes weeks to set up.
+      GHAS takes 2 minutes. And it's not just checkboxes &mdash; each of these is a sophisticated engine.</p>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Dependency Graph &mdash; Deep Dive</h4>
+      <p><strong>What it does:</strong> The Dependency Graph automatically parses your manifest files (package.json, requirements.txt, pom.xml, go.mod, Gemfile, etc.) and builds a complete map of every direct and transitive dependency your project uses. It understands the full tree &mdash; not just what you declared, but what your dependencies depend on.</p>
+      <p><strong>Out-of-the-box open source detection:</strong> Yes &mdash; it detects open source libraries automatically for 20+ ecosystems: npm, PyPI, Maven, NuGet, RubyGems, Go modules, Cargo (Rust), Composer (PHP), pub (Dart), Hex (Elixir), and more. No configuration needed &mdash; just push a manifest file and the graph builds itself.</p>
+      <p><strong>How it differentiates from competition:</strong></p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>GitHub Advisory Database:</strong> World's largest vulnerability database with community-reviewed CVEs. Snyk and Sonatype use their own proprietary databases &mdash; GitHub's is open, transparent, and curated by the community + GitHub security researchers.</li>
+        <li><strong>Transitive dependency resolution:</strong> GitHub resolves the full dependency tree, including transitive deps. Competitors like Snyk do this too, but GitHub does it natively without any CLI tool or agent installation.</li>
+        <li><strong>SBOM export:</strong> One-click Software Bill of Materials in SPDX format &mdash; critical for compliance (Executive Order 14028 requires SBOMs for federal software). Most competitors charge extra for SBOM generation.</li>
+        <li><strong>Submission API:</strong> Unlike competitors, GitHub lets build systems and package managers submit dependency snapshots via the Dependency Submission API, covering ecosystems that don't have manifest files (e.g., Bazel, Make, custom build systems).</li>
+        <li><strong>Zero friction:</strong> No agent to install, no CLI to run, no config file to write. Just enable it. Snyk requires a CLI tool; Sonatype requires Nexus Lifecycle; Checkmarx SCA requires an agent. GitHub does it with zero setup.</li>
+      </ul>
+      <p><strong>Custom/private libraries:</strong> For internal packages hosted in GitHub Packages, Azure Artifacts, or private registries:</p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Dependency Submission API:</strong> Use the <code>POST /repos/{owner}/{repo}/dependency-graph/snapshots</code> API to submit custom dependency data. Your CI/CD pipeline can call this after resolving dependencies, including private ones.</li>
+        <li><strong>GitHub Actions:</strong> Use the <code>@github/dependency-submission-toolkit</code> to build custom submitters that parse your proprietary build outputs and submit them to the graph.</li>
+        <li><strong>Manifest files:</strong> If your private packages are listed in standard manifest files (e.g., private npm packages in package.json with a scoped registry), the graph detects them automatically.</li>
+        <li><strong>Custom advisory databases:</strong> You can create private security advisories for your internal libraries in your org, so Dependabot alerts fire for your own packages too.</li>
+      </ul>
+      <p><em>Tip: If customer asks "does it work with our internal Maven repo?" &mdash; answer is yes, as long as the pom.xml references the dependency. The graph parses the manifest, not the registry.</em></p>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Dependabot &mdash; Self-Hosted Runners &amp; Azure Runners</h4>
+      <p><strong>What you see in Settings:</strong> There's a specific toggle for "Dependabot on self-hosted runners" (visible in the settings page). This is key for enterprise customers.</p>
+      <p><strong>Why self-hosted matters for Dependabot:</strong></p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Private registries:</strong> If your org uses private npm/Maven/NuGet registries behind a firewall, GitHub-hosted runners can't reach them. Self-hosted runners inside your network CAN &mdash; so Dependabot can resolve and update private dependencies.</li>
+        <li><strong>Air-gapped environments:</strong> Some enterprises (finance, government, defense) have air-gapped networks. Self-hosted runners let Dependabot run inside those environments.</li>
+        <li><strong>Custom CA certificates:</strong> If your private registry uses internal CA certs, self-hosted runners can be configured with those certs so Dependabot trusts the connection.</li>
+        <li><strong>Performance:</strong> For monorepos with thousands of dependencies, self-hosted runners with more CPU/RAM can resolve faster than GitHub-hosted runners.</li>
+      </ul>
+      <p><strong>Azure-hosted runners:</strong> You can use Azure VMs as self-hosted runners (or GitHub's new Azure-hosted larger runners). Configure by:</p>
+      <ol style="margin:4px 0 12px 20px;">
+        <li>Provision an Azure VM (Ubuntu/Windows) or use Azure Virtual Machine Scale Sets for auto-scaling</li>
+        <li>Install the GitHub Actions runner: <code>./config.sh --url https://github.com/ORG --token TOKEN</code></li>
+        <li>Label it <code>self-hosted, dependabot</code></li>
+        <li>Enable "Dependabot on self-hosted runners" in org/repo settings</li>
+        <li>Dependabot jobs now run on YOUR infrastructure with access to internal resources</li>
+      </ol>
+      <p><strong>Actions Dependabot can execute:</strong></p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Security updates:</strong> Auto-creates PRs to bump vulnerable dependencies to the nearest patched version</li>
+        <li><strong>Version updates:</strong> Keeps dependencies current (configurable via <code>dependabot.yml</code> &mdash; daily/weekly/monthly)</li>
+        <li><strong>Grouped updates:</strong> Bundles multiple dependency updates into a single PR to reduce noise (new feature visible in settings)</li>
+        <li><strong>Auto-merge:</strong> With branch protection + required checks, Dependabot PRs can auto-merge if CI passes &mdash; fully automated patching</li>
+        <li><strong>Custom registries:</strong> Configure private registries in <code>dependabot.yml</code> with auth tokens stored as repo secrets</li>
+        <li><strong>Ignore rules:</strong> Skip specific versions or dependencies you don't want updated</li>
+        <li><strong>Reviewers/assignees:</strong> Automatically assign security team members to review Dependabot PRs</li>
+      </ul>
+      <p><em>Competitive edge: Snyk requires a separate pipeline integration for auto-PRs. Mend (formerly WhiteSource) requires a bot installation. Dependabot is native to GitHub &mdash; zero additional tooling.</em></p>
+
+      <p>Secret scanning has 200+ patterns from providers like AWS, Azure, Slack, Stripe.
+      Push protection is the only tool that blocks secrets BEFORE they enter the repo.</p>
     </div>
   </div>
 </section>
@@ -852,11 +902,63 @@ body.show-notes .presenter-notes { display: block; }
 
     <div class="presenter-notes">
       <div class="notes-label">&#127908; Presenter Notes</div>
-      CodeQL is not just pattern matching &mdash; it understands data flow. It traces the user input from the HTTP
-      request parameter through variable assignments, function calls, and conditionally &mdash; all the way to the
-      dangerous sink like a SQL query. That's why it catches things that simple regex scanners miss.
-      And with Copilot Autofix, it doesn't just tell you there's a problem &mdash; it writes the fix.
-      The developer reviews and merges. Secure code, minimal friction.
+
+      <h4 style="color:#58a6ff;margin:0 0 8px;">CodeQL &mdash; How It Works</h4>
+      <p>CodeQL is not just pattern matching &mdash; it's a <strong>semantic code analysis engine</strong>. It compiles your source code into a relational database, then runs queries against that database to find vulnerabilities. Think of it as "SQL for your source code."</p>
+      <p><strong>The process:</strong></p>
+      <ol style="margin:4px 0 12px 20px;">
+        <li><strong>Build:</strong> CodeQL compiles your code (or parses it for interpreted languages) into a database that captures the AST, data flow, control flow, and type information</li>
+        <li><strong>Analyze:</strong> It runs hundreds of pre-built security queries that trace data flow from "sources" (user input) to "sinks" (dangerous operations like SQL queries)</li>
+        <li><strong>Report:</strong> Findings appear as Code Scanning alerts with exact file/line, data flow path, severity, and CWE classification</li>
+      </ol>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Why CodeQL Beats the Competition</h4>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Data flow analysis, not regex:</strong> Competitors like SonarQube and Checkmarx SAST use pattern matching and taint analysis. CodeQL models your entire codebase as a queryable database. It finds vulnerabilities that span multiple files and function calls &mdash; things regex can never catch.</li>
+        <li><strong>Open query language:</strong> CodeQL queries are open source (github/codeql repo). Your security team can write custom queries in QL. Checkmarx and Fortify queries are proprietary black boxes &mdash; you can't see what they check or customize them deeply.</li>
+        <li><strong>Community-driven:</strong> 500+ community-contributed queries. Security researchers worldwide contribute detection logic. Proprietary SAST tools depend on a single vendor's research team.</li>
+        <li><strong>Copilot Autofix:</strong> This is the killer differentiator. When CodeQL finds a vulnerability, Copilot Autofix generates the fix code &mdash; parameterized queries, input validation, output encoding. No other SAST tool can auto-generate fixes with AI. SonarQube shows you the problem; GitHub shows you the problem AND writes the fix.</li>
+        <li><strong>Zero configuration (Default Setup):</strong> Enable with one click. No build configuration, no exclusion rules, no agent installation. SonarQube requires a server deployment. Checkmarx requires project onboarding. Fortify requires a license server. CodeQL just works.</li>
+        <li><strong>PR integration:</strong> Findings appear directly in the PR diff &mdash; developers see them in context, not in a separate tool. This is shift-left done right.</li>
+        <li><strong>Free for public repos:</strong> CodeQL is free for all public repositories. Competitors charge per-user or per-scan.</li>
+      </ul>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Supported Languages</h4>
+      <p>C/C++, C#, Go, Java/Kotlin, JavaScript/TypeScript, Python, Ruby, Swift. Covers ~85% of enterprise codebases. Competitor comparison:</p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li>SonarQube: 30+ languages but shallower analysis (mostly pattern-based)</li>
+        <li>Checkmarx: 25+ languages with good Java/C# depth but weaker on JS/Python</li>
+        <li>Fortify: 25+ languages but slow scans and expensive licensing</li>
+        <li>CodeQL: Fewer languages but DEEPER analysis on each &mdash; quality over quantity</li>
+      </ul>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Self-Hosted Runners for CodeQL</h4>
+      <p><strong>Why self-hosted matters for CodeQL:</strong></p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Large codebases:</strong> CodeQL analysis of a 1M+ line Java codebase can take 30-60 minutes and needs 8GB+ RAM. GitHub-hosted runners have 7GB RAM. Self-hosted runners with 16-32GB handle large repos much better.</li>
+        <li><strong>Build dependencies:</strong> Compiled languages (C/C++, Java, C#) need the full build toolchain. If your build requires proprietary SDKs, internal libraries, or licensed compilers, self-hosted runners can have those pre-installed.</li>
+        <li><strong>Air-gapped/regulated:</strong> For customers who can't send code to GitHub-hosted runners (FedRAMP, ITAR, financial regulations), self-hosted runners keep everything on-premises.</li>
+        <li><strong>Faster iteration:</strong> Self-hosted runners with warm caches and pre-built CodeQL databases analyze faster on subsequent runs.</li>
+      </ul>
+      <p><strong>Azure-hosted CodeQL runners:</strong></p>
+      <ol style="margin:4px 0 12px 20px;">
+        <li>Use GitHub's <strong>larger runners</strong> (Azure-backed) with 8-64 cores and up to 256GB RAM for enterprise-scale scanning</li>
+        <li>Or provision Azure VM Scale Sets as self-hosted runners with auto-scaling</li>
+        <li>Pre-install CodeQL CLI bundle on the runner image for faster cold starts</li>
+        <li>Use <code>runs-on: [self-hosted, codeql]</code> label to route CodeQL jobs to dedicated runners</li>
+        <li>Configure runner groups to restrict which repos can use which runners (org-level control)</li>
+      </ol>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Custom CodeQL Queries</h4>
+      <p>For enterprise-specific security requirements:</p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Custom query packs:</strong> Write QL queries for your org's specific patterns (e.g., "our internal auth library must always be called before database access")</li>
+        <li><strong>Query suites:</strong> Bundle queries into suites and reference them in your CodeQL config: <code>queries: my-org/security-queries</code></li>
+        <li><strong>Model packs:</strong> Teach CodeQL about your custom frameworks &mdash; define what methods are "sources" (user input) and "sinks" (dangerous ops) in your internal libraries</li>
+        <li><strong>Third-party integrations:</strong> CodeQL results can be exported as SARIF and imported into any SIEM or GRC tool (Splunk, ServiceNow, Archer)</li>
+      </ul>
+
+      <p><em>Key talking point: "CodeQL doesn't just find bugs &mdash; it understands your code the way a senior security engineer would. It follows the data from user input to database query and says 'this path is exploitable.' And then Copilot writes the fix. That's not a scanner &mdash; that's an AI security team member."</em></p>
     </div>
   </div>
 </section>
@@ -911,10 +1013,81 @@ body.show-notes .presenter-notes { display: block; }
 
     <div class="presenter-notes">
       <div class="notes-label">&#127908; Presenter Notes</div>
-      Supply chain attacks are the #1 growing threat vector. SolarWinds, Log4Shell, the XZ Utils backdoor &mdash;
-      all supply chain. Dependabot monitors every dependency in your repo against the GitHub Advisory Database &mdash;
-      the world's largest vulnerability database. When a CVE drops, you get an alert within minutes and an
-      auto-generated PR to update. No human intervention needed for the routine stuff.
+
+      <h4 style="color:#58a6ff;margin:0 0 8px;">Supply Chain Security &mdash; Why It Matters</h4>
+      <p>Supply chain attacks are the #1 growing threat vector. SolarWinds, Log4Shell, the XZ Utils backdoor &mdash;
+      all supply chain. The average enterprise application has 200-500 dependencies, and each of those has its own dependencies. One vulnerable package deep in the tree can compromise everything.</p>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Dependency Graph &mdash; What to Show</h4>
+      <p>When you open Insights &rarr; Dependency Graph, walk through:</p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Dependencies tab:</strong> Shows every package your project uses, organized by manifest file. Point out the counts &mdash; "Your project has X direct dependencies and Y transitive dependencies."</li>
+        <li><strong>Dependents tab:</strong> Shows who depends on YOUR code (important for internal library maintainers).</li>
+        <li><strong>SBOM export:</strong> Click "Export SBOM" to download an SPDX-format Software Bill of Materials. "This is what your compliance team needs for Executive Order 14028, SOC 2, or any federal contract."</li>
+      </ul>
+      <p><strong>Out-of-the-box detection:</strong> The graph parses these manifest files automatically &mdash; no config needed:</p>
+      <ul style="margin:4px 0 12px 20px;columns:2;">
+        <li>npm: package.json, package-lock.json</li>
+        <li>Python: requirements.txt, Pipfile, setup.py, pyproject.toml</li>
+        <li>Maven: pom.xml</li>
+        <li>Gradle: build.gradle</li>
+        <li>NuGet: .csproj, packages.config</li>
+        <li>Go: go.mod, go.sum</li>
+        <li>Ruby: Gemfile, Gemfile.lock</li>
+        <li>Rust: Cargo.toml, Cargo.lock</li>
+        <li>PHP: composer.json</li>
+        <li>Dart: pubspec.yaml</li>
+        <li>Elixir: mix.exs</li>
+        <li>GitHub Actions: workflow YAML files</li>
+      </ul>
+      <p><strong>Custom/private libraries:</strong> If a customer asks "what about our internal packages?" &mdash; three answers:</p>
+      <ol style="margin:4px 0 12px 20px;">
+        <li><strong>If listed in manifests:</strong> They appear automatically (e.g., <code>@mycompany/auth-lib</code> in package.json)</li>
+        <li><strong>Dependency Submission API:</strong> For custom build systems (Bazel, Make, proprietary), use the API to submit dependency snapshots after your build runs</li>
+        <li><strong>Private advisories:</strong> Create security advisories for your internal packages so Dependabot alerts fire on your own CVEs</li>
+      </ol>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Dependabot &mdash; The Three Modes</h4>
+      <ol style="margin:4px 0 12px 20px;">
+        <li><strong>Dependabot Alerts:</strong> Notifies you when a dependency has a known CVE. You see the CVE, severity (CVSS), affected versions, and patched version. This is passive &mdash; it tells you, you decide what to do.</li>
+        <li><strong>Dependabot Security Updates:</strong> ACTIVE mode &mdash; automatically creates PRs to bump the vulnerable dependency to the nearest patched version. The PR includes changelog, compatibility notes, and CI check results.</li>
+        <li><strong>Dependabot Version Updates:</strong> Keeps ALL dependencies current (not just vulnerable ones). Configure via <code>.github/dependabot.yml</code> to run daily/weekly/monthly. Reduces the "update debt" that makes emergency patches painful.</li>
+      </ol>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Self-Hosted Runners &amp; Azure for Dependabot</h4>
+      <p>This is visible in the settings page &mdash; "Dependabot on self-hosted runners." Enable this when:</p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>Private registries behind firewalls:</strong> Your npm/Maven/NuGet registry is internal. GitHub-hosted runners can't reach it. Self-hosted runners inside your VNet can.</li>
+        <li><strong>Custom CA certificates:</strong> Internal registries use internal CAs. Install the cert on the self-hosted runner.</li>
+        <li><strong>Regulated industries:</strong> Financial services, healthcare, government &mdash; code can't leave the network. Self-hosted runners keep everything on-prem.</li>
+        <li><strong>Performance for monorepos:</strong> A repo with 50 manifest files generates 50 Dependabot jobs. Self-hosted runners with auto-scaling handle this better.</li>
+      </ul>
+      <p><strong>Azure-hosted setup:</strong></p>
+      <ol style="margin:4px 0 12px 20px;">
+        <li>Create an Azure VM Scale Set (VMSS) with Ubuntu 22.04</li>
+        <li>Install the GitHub Actions runner on the base image</li>
+        <li>Configure VNet peering so the runner can reach your private registries</li>
+        <li>In GitHub org settings: enable "Dependabot on self-hosted runners"</li>
+        <li>Dependabot jobs now run on your Azure infrastructure with access to internal packages</li>
+      </ol>
+      <p><strong>Actions Dependabot can take on self-hosted runners:</strong></p>
+      <ul style="margin:4px 0 12px 20px;">
+        <li>Resolve dependencies from private registries (NPM, Maven, NuGet, PyPI, etc.)</li>
+        <li>Run your full CI pipeline on the PR (since the runner has access to internal services)</li>
+        <li>Execute post-update scripts (database migrations, lock file regeneration)</li>
+        <li>Auto-merge security updates if all checks pass (combine with branch protection required checks)</li>
+        <li>Grouped updates &mdash; bundle multiple dependency bumps into one PR (reduces PR noise by 60-70%)</li>
+      </ul>
+
+      <h4 style="color:#58a6ff;margin:16px 0 8px;">Competitive Differentiation</h4>
+      <ul style="margin:4px 0 12px 20px;">
+        <li><strong>vs. Snyk:</strong> Snyk requires a CLI tool (<code>snyk test</code>), a separate Snyk account, and a pipeline integration. Dependabot is native &mdash; zero additional tooling. Snyk's auto-fix PRs are similar but require Snyk's platform. Dependabot does it natively in GitHub.</li>
+        <li><strong>vs. Mend (WhiteSource):</strong> Requires Renovate bot installation, separate dashboard, and license. More configurable but more complex. Dependabot is simpler and free.</li>
+        <li><strong>vs. Sonatype (Nexus Lifecycle):</strong> Enterprise-grade but expensive ($100K+/year for large orgs). Requires Nexus server deployment. Dependabot is included with GitHub.</li>
+        <li><strong>Key differentiator:</strong> GitHub owns the entire workflow &mdash; from dependency detection to alert to PR to merge to deployment. No context switching between tools. Everything in one platform.</li>
+      </ul>
+
+      <p><em>Closing talking point: "Think about the developer experience. With Snyk, your developer pushes code, gets an email from Snyk, logs into the Snyk dashboard, reads the advisory, goes back to their IDE, writes the fix. With GitHub, the developer pushes code, sees the Dependabot PR already waiting with the fix. One click to merge. That's the difference between a tool and a platform."</em></p>
     </div>
   </div>
 </section>
