@@ -684,6 +684,110 @@ body.show-notes .presenter-notes { display: block; }
       </ul>
       <p><em>Tip: If customer asks "does it work with our internal Maven repo?" &mdash; answer is yes, as long as the pom.xml references the dependency. The graph parses the manifest, not the registry.</em></p>
 
+      <div style="background:#1c2333;border:1px solid #30363d;border-radius:8px;padding:16px;margin:12px 0;">
+        <h4 style="color:#d29922;margin:0 0 10px;">&#128161; Deep Dive: "Does it work with our internal Maven repo?"</h4>
+        <p>This is one of the most common enterprise questions. Here's the full picture:</p>
+
+        <p><strong>How Dependency Graph actually works:</strong></p>
+        <p>The Dependency Graph does NOT connect to any registry. It reads your manifest files (pom.xml, package.json, requirements.txt, etc.) that are checked into your GitHub repo. It parses the XML/JSON/text to extract package names and version numbers. That's it &mdash; it's a file parser, not a registry client.</p>
+
+        <p><strong>So for a pom.xml like this:</strong></p>
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;color:#e6edf3;margin:8px 0;"><code>&lt;dependencies&gt;
+  &lt;!-- Public dependency from Maven Central --&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+    &lt;version&gt;3.2.0&lt;/version&gt;
+  &lt;/dependency&gt;
+
+  &lt;!-- Internal dependency from your private Nexus/Artifactory --&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt;com.contoso.internal&lt;/groupId&gt;
+    &lt;artifactId&gt;auth-library&lt;/artifactId&gt;
+    &lt;version&gt;2.4.1&lt;/version&gt;
+  &lt;/dependency&gt;
+&lt;/dependencies&gt;</code></pre>
+
+        <p>The Dependency Graph will show <strong>both</strong> dependencies &mdash; the public Spring Boot one AND your internal <code>com.contoso.internal:auth-library</code>. It doesn't care where they come from. It just reads the pom.xml.</p>
+
+        <p><strong>But here's the nuance &mdash; three different concerns:</strong></p>
+
+        <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;">
+          <tr style="border-bottom:1px solid #30363d;">
+            <th style="text-align:left;padding:8px;color:#58a6ff;">Concern</th>
+            <th style="text-align:left;padding:8px;color:#58a6ff;">Public Packages</th>
+            <th style="text-align:left;padding:8px;color:#58a6ff;">Internal Packages</th>
+          </tr>
+          <tr style="border-bottom:1px solid #21262d;">
+            <td style="padding:8px;"><strong>1. Visibility in Dependency Graph</strong></td>
+            <td style="padding:8px;">&#9989; Automatic &mdash; parsed from manifest</td>
+            <td style="padding:8px;">&#9989; Automatic &mdash; parsed from manifest (same behavior)</td>
+          </tr>
+          <tr style="border-bottom:1px solid #21262d;">
+            <td style="padding:8px;"><strong>2. CVE/Vulnerability Alerts</strong></td>
+            <td style="padding:8px;">&#9989; Automatic &mdash; matched against GitHub Advisory Database (200K+ advisories)</td>
+            <td style="padding:8px;">&#9888; Only if you create <strong>private security advisories</strong> for your internal packages. GitHub's advisory DB only knows about public open source packages.</td>
+          </tr>
+          <tr style="border-bottom:1px solid #21262d;">
+            <td style="padding:8px;"><strong>3. Dependabot Auto-Update PRs</strong></td>
+            <td style="padding:8px;">&#9989; Automatic &mdash; Dependabot resolves from Maven Central</td>
+            <td style="padding:8px;">&#9888; Needs configuration &mdash; Dependabot must be told how to reach your private registry (Nexus, Artifactory, Azure Artifacts)</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;"><strong>4. Transitive Dependencies</strong></td>
+            <td style="padding:8px;">&#9989; Resolved from lock files or build output</td>
+            <td style="padding:8px;">&#9888; Needs <strong>Dependency Submission API</strong> or self-hosted runner that can access the private registry to resolve the full tree</td>
+          </tr>
+        </table>
+
+        <p><strong>Configuring Dependabot for private Maven registries:</strong></p>
+        <p>Add a <code>.github/dependabot.yml</code> file to your repo:</p>
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;color:#e6edf3;margin:8px 0;"><code># .github/dependabot.yml
+version: 2
+registries:
+  contoso-nexus:
+    type: maven-repository
+    url: https://nexus.contoso.internal/repository/maven-releases/
+    username: ${{secrets.NEXUS_USERNAME}}
+    password: ${{secrets.NEXUS_PASSWORD}}
+
+updates:
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    registries:
+      - contoso-nexus    # Tell Dependabot to check this registry too</code></pre>
+
+        <p><strong>For Azure Artifacts (common in Microsoft shops):</strong></p>
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;color:#e6edf3;margin:8px 0;"><code>registries:
+  azure-artifacts:
+    type: maven-repository
+    url: https://pkgs.dev.azure.com/contoso/_packaging/internal/maven/v1
+    username: azure
+    password: ${{secrets.AZURE_ARTIFACTS_PAT}}</code></pre>
+
+        <p><strong>For Artifactory (JFrog):</strong></p>
+        <pre style="background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;color:#e6edf3;margin:8px 0;"><code>registries:
+  jfrog-artifactory:
+    type: maven-repository
+    url: https://contoso.jfrog.io/artifactory/libs-release/
+    username: ${{secrets.JFROG_USERNAME}}
+    password: ${{secrets.JFROG_API_KEY}}</code></pre>
+
+        <p><strong>When private registry is behind a firewall:</strong></p>
+        <p>This is where <strong>self-hosted runners + Dependabot on self-hosted runners</strong> comes in:</p>
+        <ol style="margin:4px 0 8px 20px;">
+          <li>Deploy a self-hosted runner inside the same VNet/network as your Nexus/Artifactory server</li>
+          <li>Enable "Dependabot on self-hosted runners" in org settings</li>
+          <li>Dependabot jobs now run on YOUR runner, which can reach the internal registry</li>
+          <li>No need to expose your internal registry to the internet</li>
+        </ol>
+
+        <p><strong>Bottom line for the customer:</strong></p>
+        <p style="color:#3fb950;font-weight:bold;">"Your internal Maven dependencies will show up in the Dependency Graph automatically &mdash; no config needed. For vulnerability alerts on internal packages, you create private advisories. For auto-update PRs from your private Nexus/Artifactory, you add a 10-line config file. And if your registry is behind a firewall, you use a self-hosted runner. GitHub covers every scenario."</p>
+      </div>
+
       <h4 style="color:#58a6ff;margin:16px 0 8px;">Dependabot &mdash; Self-Hosted Runners &amp; Azure Runners</h4>
       <p><strong>What you see in Settings:</strong> There's a specific toggle for "Dependabot on self-hosted runners" (visible in the settings page). This is key for enterprise customers.</p>
       <p><strong>Why self-hosted matters for Dependabot:</strong></p>
